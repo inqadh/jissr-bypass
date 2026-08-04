@@ -1,0 +1,346 @@
+// Package jissrbypass provides an HTTP transport that resolves HTTPS and ECH
+// DNS records over DNS-over-HTTPS, then performs TLS 1.3 with Encrypted Client
+// Hello. It is intended for native applications whose ordinary DNS or
+// plaintext ClientHello is interfered with.
+package jissrbypass
+
+import (
+	"bytes"
+	"context"
+	"crypto/rand"
+	"crypto/tls"
+	"encoding/base64"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"net"
+	"net/http"
+	"net/url"
+	"strings"
+	"time"
+
+	"golang.org/x/net/idna"
+)
+
+const (
+	defaultUserAgent = "Jissr-Bypass/0.1"
+	maxResponseBytes = 4 << 20
+)
+
+// Config controls resolver selection and network deadlines. Empty resolver
+// slices use the built-in Cloudflare and Google endpoints.
+type Config struct {
+	WireResolvers  []string
+	JSONResolvers  []string
+	ResolveTimeout time.Duration
+	DialTimeout    time.Duration
+	RequestTimeout time.Duration
+	UserAgent      string
+}
+
+// DefaultConfig returns conservative defaults suitable for mobile and desktop.
+func DefaultConfig() Config {
+	return Config{
+		WireResolvers: []string{
+			"https://cloudflare-dns.com/dns-query",
+			"https://1.1.1.1/dns-query",
+			"https://dns.google/dns-query",
+			"https://8.8.8.8/dns-query",
+		},
+		JSONResolvers: []string{
+			"https://cloudflare-dns.com/dns-query",
+			"https://1.1.1.1/dns-query",
+			"https://8.8.8.8/resolve",
+			"https://dns.google/resolve",
+		},
+		ResolveTimeout: 7 * time.Second,
+		DialTimeout:    10 * time.Second,
+		RequestTimeout: 30 * time.Second,
+		UserAgent:      defaultUserAgent,
+	}
+}
+
+// Client is safe for concurrent use.
+type Client struct {
+	config Config
+}
+
+// NewClient validates and normalizes config.
+func NewClient(config Config) (*Client, error) {
+	defaults := DefaultConfig()
+	if len(config.WireResolvers) == 0 {
+		config.WireResolvers = defaults.WireResolvers
+	}
+	if len(config.JSONResolvers) == 0 {
+		config.JSONResolvers = defaults.JSONResolvers
+	}
+	if config.ResolveTimeout <= 0 {
+		config.ResolveTimeout = defaults.ResolveTimeout
+	}
+	if config.DialTimeout <= 0 {
+		config.DialTimeout = defaults.DialTimeout
+	}
+	if config.RequestTimeout <= 0 {
+		config.RequestTimeout = defaults.RequestTimeout
+	}
+	if config.UserAgent == "" {
+		config.UserAgent = defaults.UserAgent
+	}
+	for _, endpoint := range append(append([]string{}, config.WireResolvers...), config.JSONResolvers...) {
+		u, err := url.Parse(endpoint)
+		if err != nil || u.Scheme != "https" || u.Host == "" {
+			return nil, fmt.Errorf("invalid DoH endpoint %q", endpoint)
+		}
+	}
+	return &Client{config: config}, nil
+}
+
+// NewDefaultClient constructs a client with Cloudflare and Google fallbacks.
+// Its signature is deliberately gomobile-friendly.
+func NewDefaultClient() *Client {
+	client, _ := NewClient(DefaultConfig())
+	return client
+}
+
+// Resolution identifies the address and resolver selected for an ECH request.
+type Resolution struct {
+	IP       string
+	Resolver string
+	ECH      []byte
+}
+
+// Resolve retrieves a mutually consistent A and HTTPS/ECH answer from one
+// resolver. It never combines an address from one provider with ECH data from
+// another.
+func (c *Client) Resolve(ctx context.Context, host string) (Resolution, error) {
+	host, err := canonicalHost(host)
+	if err != nil {
+		return Resolution{}, err
+	}
+	resolveCtx, cancel := context.WithTimeout(ctx, c.config.ResolveTimeout)
+	defer cancel()
+	return resolveECH(resolveCtx, host, c.config)
+}
+
+func canonicalHost(host string) (string, error) {
+	host = strings.TrimSuffix(strings.TrimSpace(host), ".")
+	if host == "" || net.ParseIP(host) != nil {
+		return "", fmt.Errorf("host must be a DNS name")
+	}
+	ascii, err := idna.Lookup.ToASCII(host)
+	if err != nil || len(ascii) > 253 {
+		return "", fmt.Errorf("invalid DNS hostname")
+	}
+	ascii = strings.ToLower(ascii)
+	for _, label := range strings.Split(ascii, ".") {
+		if len(label) == 0 || len(label) > 63 || label[0] == '-' || label[len(label)-1] == '-' {
+			return "", fmt.Errorf("invalid DNS hostname")
+		}
+		for _, character := range label {
+			if (character < 'a' || character > 'z') &&
+				(character < '0' || character > '9') &&
+				character != '-' {
+				return "", fmt.Errorf("invalid DNS hostname")
+			}
+		}
+	}
+	return ascii, nil
+}
+
+// Do sends an HTTPS request through ECH. Redirects are returned to the caller
+// rather than followed implicitly, preventing a redirect from escaping the ECH
+// transport.
+func (c *Client) Do(request *http.Request) (*http.Response, error) {
+	if request == nil || request.URL == nil {
+		return nil, errors.New("request is required")
+	}
+	if request.URL.Scheme != "https" {
+		return nil, errors.New("Jissr Bypass only permits https URLs")
+	}
+	if request.URL.User != nil {
+		return nil, errors.New("credentials in URLs are not permitted")
+	}
+	if port := request.URL.Port(); port != "" && port != "443" {
+		return nil, errors.New("only HTTPS port 443 is supported")
+	}
+	host, err := canonicalHost(request.URL.Hostname())
+	if err != nil {
+		return nil, err
+	}
+	resolution, err := c.Resolve(request.Context(), host)
+	if err != nil {
+		return nil, fmt.Errorf("resolve %s: %w", host, err)
+	}
+
+	dialer := &net.Dialer{Timeout: c.config.DialTimeout}
+	transport := &http.Transport{
+		DialTLSContext: func(ctx context.Context, network, _ string) (net.Conn, error) {
+			return dialECH(ctx, dialer, network, resolution.IP, host, resolution.ECH, []string{"h2", "http/1.1"})
+		},
+		ForceAttemptHTTP2: true,
+	}
+	if request.Header.Get("User-Agent") == "" {
+		request.Header.Set("User-Agent", c.config.UserAgent)
+	}
+	httpClient := &http.Client{
+		Transport: transport,
+		Timeout:   c.config.RequestTimeout,
+		CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
+	return httpClient.Do(request)
+}
+
+// Fetch is the portable mobile/desktop API. It returns the response body only
+// for a successful 2xx response.
+func (c *Client) Fetch(method, rawURL string, body []byte) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), c.config.RequestTimeout)
+	defer cancel()
+	request, err := http.NewRequestWithContext(ctx, strings.ToUpper(method), rawURL, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+	if len(body) > 0 {
+		request.Header.Set("Content-Type", "application/json")
+	}
+	response, err := c.Do(request)
+	if err != nil {
+		return nil, err
+	}
+	defer response.Body.Close()
+	responseBody, err := io.ReadAll(io.LimitReader(response.Body, maxResponseBytes+1))
+	if err != nil {
+		return nil, err
+	}
+	if len(responseBody) > maxResponseBytes {
+		return nil, fmt.Errorf("response exceeds %d bytes", maxResponseBytes)
+	}
+	if response.StatusCode < 200 || response.StatusCode > 299 {
+		return nil, fmt.Errorf("http %d: %.1000s", response.StatusCode, responseBody)
+	}
+	return responseBody, nil
+}
+
+// ProbeResult gives applications actionable diagnostics without exposing
+// resolver response bodies or other sensitive data.
+type ProbeResult struct {
+	OK       bool
+	Host     string
+	IP       string
+	Resolver string
+	Stage    string
+	Detail   string
+}
+
+// Probe resolves and handshakes with host without making an HTTP request.
+func (c *Client) Probe(host string) *ProbeResult {
+	result := &ProbeResult{Host: host, Stage: "resolve"}
+	ctx, cancel := context.WithTimeout(context.Background(), c.config.RequestTimeout)
+	defer cancel()
+	resolution, err := c.Resolve(ctx, host)
+	if err != nil {
+		result.Detail = err.Error()
+		return result
+	}
+	result.IP = resolution.IP
+	result.Resolver = resolution.Resolver
+	result.Stage = "ech"
+	connection, err := dialECH(
+		ctx,
+		&net.Dialer{Timeout: c.config.DialTimeout},
+		"tcp",
+		resolution.IP,
+		host,
+		resolution.ECH,
+		nil,
+	)
+	if err != nil {
+		if strings.HasPrefix(err.Error(), "tcp:") {
+			result.Stage = "tcp"
+		}
+		result.Detail = err.Error()
+		return result
+	}
+	defer connection.Close()
+	result.OK = true
+	result.Stage = "complete"
+	return result
+}
+
+// dialECH retries once when the authenticated rejection carries a fresh
+// ECHConfigList. This handles normal provider key rotation without falling back
+// to a plaintext ClientHello.
+func dialECH(ctx context.Context, dialer *net.Dialer, network, ip, host string, echConfig []byte, protocols []string) (net.Conn, error) {
+	config := append([]byte(nil), echConfig...)
+	for attempt := 0; attempt < 2; attempt++ {
+		raw, err := dialer.DialContext(ctx, network, net.JoinHostPort(ip, "443"))
+		if err != nil {
+			return nil, fmt.Errorf("tcp: %w", err)
+		}
+		connection := tls.Client(raw, &tls.Config{
+			ServerName:                     host,
+			EncryptedClientHelloConfigList: config,
+			MinVersion:                     tls.VersionTLS13,
+			NextProtos:                     protocols,
+		})
+		err = connection.HandshakeContext(ctx)
+		if err == nil {
+			return connection, nil
+		}
+		_ = raw.Close()
+		var rejection *tls.ECHRejectionError
+		if attempt == 0 && errors.As(err, &rejection) && validECHConfigList(rejection.RetryConfigList) {
+			config = append([]byte(nil), rejection.RetryConfigList...)
+			continue
+		}
+		return nil, fmt.Errorf("ECH handshake: %w", err)
+	}
+	return nil, errors.New("ECH handshake failed")
+}
+
+// CanaryResult is returned only after the server echoes the unpredictable
+// nonce generated by this client.
+type CanaryResult struct {
+	OK       bool   `json:"ok"`
+	Protocol string `json:"protocol"`
+	Host     string `json:"host"`
+	Nonce    string `json:"nonce"`
+	IssuedAt string `json:"issued_at"`
+}
+
+// VerifyCanary checks the standard Jissr Bypass canary protocol.
+func (c *Client) VerifyCanary(rawURL string) (*CanaryResult, error) {
+	parsed, err := url.Parse(rawURL)
+	if err != nil || parsed.Scheme != "https" || parsed.Host == "" {
+		return nil, fmt.Errorf("invalid HTTPS canary URL")
+	}
+	nonceBytes := make([]byte, 24)
+	if _, err := rand.Read(nonceBytes); err != nil {
+		return nil, fmt.Errorf("create nonce: %w", err)
+	}
+	nonce := base64.RawURLEncoding.EncodeToString(nonceBytes)
+	query := parsed.Query()
+	query.Set("nonce", nonce)
+	parsed.RawQuery = query.Encode()
+	body, err := c.Fetch(http.MethodGet, parsed.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+	var result CanaryResult
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, fmt.Errorf("decode canary: %w", err)
+	}
+	if !result.OK || result.Protocol != "jissr-bypass/1" || result.Nonce != nonce {
+		return nil, fmt.Errorf("canary verification failed")
+	}
+	if !strings.EqualFold(result.Host, parsed.Hostname()) {
+		return nil, fmt.Errorf("canary host mismatch")
+	}
+	issuedAt, err := time.Parse(time.RFC3339, result.IssuedAt)
+	if err != nil || time.Since(issuedAt) > 5*time.Minute || time.Until(issuedAt) > time.Minute {
+		return nil, fmt.Errorf("canary timestamp is invalid or stale")
+	}
+	return &result, nil
+}

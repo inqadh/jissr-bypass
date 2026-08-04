@@ -1,0 +1,6 @@
+/dist/
+/canary/node_modules/
+/canary/package-lock.json
+*.xcframework
+*.aar
+*.zip
