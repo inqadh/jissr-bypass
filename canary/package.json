@@ -1,0 +1,11 @@
+{
+  "name": "@jissr/bypass-canary",
+  "private": true,
+  "scripts": {
+    "check": "wrangler deploy --config wrangler.toml --dry-run",
+    "deploy": "wrangler deploy --config wrangler.toml"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}

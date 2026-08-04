@@ -1,0 +1,8 @@
+name = "jissr-bypass-canary"
+account_id = "a128589edadc7398806406d673b76ca5"
+main = "src/index.ts"
+compatibility_date = "2026-08-01"
+
+[[routes]]
+pattern = "blocked.yusef.ren"
+custom_domain = true
