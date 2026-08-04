@@ -1,14 +1,32 @@
 import Foundation
 import Jissrbypass
 
-func verifyJissrBypass() async throws -> String {
+struct BypassResponse {
+    let statusCode: Int
+    let body: Data
+    let headersJSON: String
+}
+
+func fetchWithJissrBypass() async throws -> BypassResponse {
     try await Task.detached(priority: .userInitiated) {
         var error: NSError?
-        let value = JissrbypassNewClient()
-            .verifyCanary("https://blocked.yusef.ren/v1/canary", error: &error)
+        let response = JissrbypassNewClient().execute(
+            "GET",
+            url: "https://blocked.yusef.ren/v1/health",
+            body: Data(),
+            headersJSON: #"{"Accept":"application/json"}"#,
+            error: &error
+        )
         if let error {
             throw error
         }
-        return value
+        guard let response else {
+            throw NSError(domain: "JissrBypass", code: -1)
+        }
+        return BypassResponse(
+            statusCode: Int(response.getStatusCode()),
+            body: response.getBody(),
+            headersJSON: response.getHeadersJSON()
+        )
     }.value
 }

@@ -79,6 +79,34 @@ func TestCanonicalHost(t *testing.T) {
 	}
 }
 
+func TestCopyRequestHeaders(t *testing.T) {
+	destination := make(http.Header)
+	source := http.Header{
+		"Authorization": {"Bearer test"},
+		"X-Trace":       {"one", "two"},
+	}
+	if err := copyRequestHeaders(destination, source); err != nil {
+		t.Fatal(err)
+	}
+	if destination.Get("Authorization") != "Bearer test" || len(destination.Values("X-Trace")) != 2 {
+		t.Fatalf("headers were not copied: %#v", destination)
+	}
+}
+
+func TestCopyRequestHeadersRejectsUnsafeValues(t *testing.T) {
+	tests := []http.Header{
+		{"Host": {"other.example"}},
+		{"Connection": {"close"}},
+		{"Bad Header": {"value"}},
+		{"X-Test": {"safe\r\nInjected: yes"}},
+	}
+	for _, headers := range tests {
+		if err := copyRequestHeaders(make(http.Header), headers); err == nil {
+			t.Fatalf("unsafe headers accepted: %#v", headers)
+		}
+	}
+}
+
 func TestWireDoHResolvesCorrelatedAddressAndECH(t *testing.T) {
 	ech := []byte{0, 4, 0xfe, 0x0d, 0, 0}
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
