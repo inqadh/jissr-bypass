@@ -9,20 +9,8 @@ The same Go core builds for Android, iOS, macOS, Windows, and Linux.
 
 > Status: pre-release. The public API may change before `v1.0.0`.
 
-## Why wire-format DNS-over-HTTPS?
-
-An ECH configuration is binary data carried in the `ech` service parameter of
-an HTTPS DNS record. Jissr Bypass requests `application/dns-message`, the wire
-format standardized by RFC 8484. This preserves the exact record bytes.
-
-JSON DNS APIs are retained only as a compatibility fallback because providers
-may represent the same HTTPS record as presentation text or RFC 3597 raw data.
-The library understands both representations, but it does not depend on either
-one for its primary path.
-
-Each resolver must return both a valid address and a valid ECH configuration.
-The library never combines an address from one resolver with ECH data from
-another.
+For server setup and complete application examples, follow the
+[A-to-Z integration guide](docs/integration-guide.md).
 
 ## Go and desktop
 
@@ -30,19 +18,31 @@ another.
 package main
 
 import (
+    "context"
     "fmt"
     "log"
+    "net/http"
 
     bypass "github.com/jissr-org/jissr-bypass"
 )
 
 func main() {
-    result, err := bypass.NewDefaultClient().
-        VerifyCanary("https://blocked.yusef.ren/v1/canary")
+    request, err := http.NewRequestWithContext(
+        context.Background(),
+        http.MethodGet,
+        "https://api.example.com/v1/profile",
+        nil,
+    )
     if err != nil {
         log.Fatal(err)
     }
-    fmt.Printf("verified %s at %s\n", result.Host, result.IssuedAt)
+    request.Header.Set("Authorization", "Bearer <access-token>")
+    response, err := bypass.NewDefaultClient().Do(request)
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer response.Body.Close()
+    fmt.Printf("HTTP %d\n", response.StatusCode)
 }
 ```
 
@@ -66,8 +66,13 @@ Add `dist/android/jissr-bypass.aar` to the application's dependencies, then:
 ```kotlin
 import jissrbypass.Jissrbypass
 
-val resultJson = Jissrbypass.newClient()
-    .verifyCanary("https://blocked.yusef.ren/v1/canary")
+val response = Jissrbypass.newClient().execute(
+    "GET",
+    "https://api.example.com/v1/profile",
+    ByteArray(0),
+    """{"Authorization":"Bearer <access-token>"}"""
+)
+check(response.statusCode in 200L..299L)
 ```
 
 Network calls are blocking and must run on a background dispatcher. The
@@ -120,8 +125,9 @@ resolvers are reachable. It cannot solve destination-IP blocking, total
 network loss, a server without ECH, or a network that blocks every configured
 resolver.
 
-See [docs/threat-model.md](docs/threat-model.md) and [SECURITY.md](SECURITY.md)
-before integrating it into a production application.
+See the [integration guide](docs/integration-guide.md),
+[threat model](docs/threat-model.md), and [security policy](SECURITY.md) before
+integrating it into a production application.
 
 ## Distribution plan
 

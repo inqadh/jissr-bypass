@@ -16,10 +16,16 @@ class MainActivity : ComponentActivity() {
         lifecycleScope.launch {
             result.text = withContext(Dispatchers.IO) {
                 try {
-                    Jissrbypass.newClient()
-                        .verifyCanary("https://blocked.yusef.ren/v1/canary")
+                    val response = Jissrbypass.newClient().execute(
+                        "GET",
+                        "https://blocked.yusef.ren/v1/health",
+                        ByteArray(0),
+                        """{"Accept":"application/json"}"""
+                    )
+                    "HTTP ${response.statusCode}: " +
+                        response.body.toString(Charsets.UTF_8)
                 } catch (error: Exception) {
-                    "Canary failed: ${error.message}"
+                    "Request failed: ${error.message}"
                 }
             }
         }

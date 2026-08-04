@@ -20,6 +20,7 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/net/http/httpguts"
 	"golang.org/x/net/idna"
 )
 
@@ -64,6 +65,14 @@ func DefaultConfig() Config {
 // Client is safe for concurrent use.
 type Client struct {
 	config Config
+}
+
+// Result contains the complete bounded response returned by Execute.
+// Headers is a defensive copy and Body is limited to 4 MiB.
+type Result struct {
+	StatusCode int
+	Headers    http.Header
+	Body       []byte
 }
 
 // NewClient validates and normalizes config.
@@ -180,6 +189,9 @@ func (c *Client) Do(request *http.Request) (*http.Response, error) {
 		},
 		ForceAttemptHTTP2: true,
 	}
+	if request.Header == nil {
+		request.Header = make(http.Header)
+	}
 	if request.Header.Get("User-Agent") == "" {
 		request.Header.Set("User-Agent", c.config.UserAgent)
 	}
@@ -193,17 +205,21 @@ func (c *Client) Do(request *http.Request) (*http.Response, error) {
 	return httpClient.Do(request)
 }
 
-// Fetch is the portable mobile/desktop API. It returns the response body only
-// for a successful 2xx response.
-func (c *Client) Fetch(method, rawURL string, body []byte) ([]byte, error) {
+// Execute creates and sends an ECH-protected HTTPS request. Unlike Fetch, it
+// returns every HTTP status so applications can handle their own API contract.
+func (c *Client) Execute(method, rawURL string, body []byte, headers http.Header) (*Result, error) {
+	method = strings.ToUpper(strings.TrimSpace(method))
+	if method == "" {
+		return nil, errors.New("HTTP method is required")
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), c.config.RequestTimeout)
 	defer cancel()
-	request, err := http.NewRequestWithContext(ctx, strings.ToUpper(method), rawURL, bytes.NewReader(body))
+	request, err := http.NewRequestWithContext(ctx, method, rawURL, bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
-	if len(body) > 0 {
-		request.Header.Set("Content-Type", "application/json")
+	if err := copyRequestHeaders(request.Header, headers); err != nil {
+		return nil, err
 	}
 	response, err := c.Do(request)
 	if err != nil {
@@ -217,10 +233,47 @@ func (c *Client) Fetch(method, rawURL string, body []byte) ([]byte, error) {
 	if len(responseBody) > maxResponseBytes {
 		return nil, fmt.Errorf("response exceeds %d bytes", maxResponseBytes)
 	}
-	if response.StatusCode < 200 || response.StatusCode > 299 {
-		return nil, fmt.Errorf("http %d: %.1000s", response.StatusCode, responseBody)
+	return &Result{
+		StatusCode: response.StatusCode,
+		Headers:    response.Header.Clone(),
+		Body:       responseBody,
+	}, nil
+}
+
+func copyRequestHeaders(destination, source http.Header) error {
+	for name, values := range source {
+		if !httpguts.ValidHeaderFieldName(name) {
+			return fmt.Errorf("invalid HTTP header name %q", name)
+		}
+		switch http.CanonicalHeaderKey(name) {
+		case "Host", "Content-Length", "Transfer-Encoding", "Connection":
+			return fmt.Errorf("HTTP header %q is managed by the transport", name)
+		}
+		for _, value := range values {
+			if !httpguts.ValidHeaderFieldValue(value) {
+				return fmt.Errorf("invalid value for HTTP header %q", name)
+			}
+			destination.Add(name, value)
+		}
 	}
-	return responseBody, nil
+	return nil
+}
+
+// Fetch is the portable mobile/desktop API. It returns the response body only
+// for a successful 2xx response.
+func (c *Client) Fetch(method, rawURL string, body []byte) ([]byte, error) {
+	headers := make(http.Header)
+	if len(body) > 0 {
+		headers.Set("Content-Type", "application/json")
+	}
+	response, err := c.Execute(method, rawURL, body, headers)
+	if err != nil {
+		return nil, err
+	}
+	if response.StatusCode < 200 || response.StatusCode > 299 {
+		return nil, fmt.Errorf("http %d: %.1000s", response.StatusCode, response.Body)
+	}
+	return response.Body, nil
 }
 
 // ProbeResult gives applications actionable diagnostics without exposing
