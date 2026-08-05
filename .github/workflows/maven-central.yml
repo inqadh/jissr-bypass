@@ -27,7 +27,7 @@ jobs:
     timeout-minutes: 30
     environment: maven-central
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.tag }}
       - uses: actions/setup-go@v6
@@ -82,7 +82,7 @@ jobs:
     timeout-minutes: 20
     environment: maven-central
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.tag }}
       - uses: actions/download-artifact@v6
