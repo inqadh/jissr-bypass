@@ -133,8 +133,8 @@ central session without changing existing `URLRequest` construction. See the
 
 ## Canary protocol
 
-`blocked.yusef.ren` is a controlled Worker used only as a connectivity canary.
-The client generates a random nonce and requests:
+`blocked.yusef.ren` is a project-hosted connectivity canary that is ready for
+SDK consumers to use. The client generates a random nonce and requests:
 
 ```text
 GET https://blocked.yusef.ren/v1/canary?nonce=<base64url>

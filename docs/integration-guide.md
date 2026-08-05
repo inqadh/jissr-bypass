@@ -394,18 +394,18 @@ Use the probe for diagnostics, not as a mandatory preflight before every API
 request. A preflight doubles latency and introduces a race between the check and
 the real call.
 
-`https://blocked.yusef.ren/v1/canary` is a public integration example. The
-`VerifyCanary` method generates a random nonce and verifies the echoed protocol,
-host, and timestamp:
+`https://blocked.yusef.ren/v1/canary` is the project-hosted integration
+canary. It is already deployed and ready to use; consumers do not need to
+provision or manage its infrastructure. The `VerifyCanary` method generates a
+random nonce and verifies the echoed protocol, host, and timestamp:
 
 ```kotlin
 val resultJSON = Jissrbypass.newClient()
     .verifyCanary("https://blocked.yusef.ren/v1/canary")
 ```
 
-For production monitoring, create a canary under a domain you control and keep
-it independent of authentication, databases, and application state. Do not make
-another organization's canary a prerequisite for your API.
+Use the canary for diagnostics and compatibility monitoring, not as a mandatory
+preflight or runtime dependency for application requests.
 
 ## 9. Preserve security properties
 

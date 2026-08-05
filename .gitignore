@@ -5,8 +5,6 @@
 **/local.properties
 adapters/apple/Binaries/
 /.secrets/
-/canary/node_modules/
-/canary/package-lock.json
 *.xcframework
 *.aar
 *.zip
