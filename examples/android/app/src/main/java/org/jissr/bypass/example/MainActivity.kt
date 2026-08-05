@@ -12,11 +12,16 @@ import kotlinx.coroutines.withContext
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val result = TextView(this).also { setContentView(it) }
+        val result = TextView(this).also {
+            it.text = "Checking Jissr Bypass…"
+            setContentView(it)
+        }
+        val client = Jissrbypass.newClient()
+
         lifecycleScope.launch {
             result.text = withContext(Dispatchers.IO) {
                 try {
-                    val response = Jissrbypass.newClient().execute(
+                    val response = client.execute(
                         "GET",
                         "https://blocked.yusef.ren/v1/health",
                         ByteArray(0),

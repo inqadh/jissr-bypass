@@ -33,7 +33,7 @@ if [[ -z "${MAVEN_SIGNING_KEY_B64:-}" ]]; then
   exit 2
 fi
 
-for command_name in base64 gpg jar md5sum sha1sum sha256sum sha512sum zip; do
+for command_name in base64 gpg jar javadoc md5sum sha1sum sha256sum sha512sum unzip zip; do
   if ! command -v "$command_name" >/dev/null 2>&1; then
     echo "Required command is unavailable: $command_name" >&2
     exit 2
@@ -59,11 +59,31 @@ pom_name="$artifact_prefix.pom"
 cp "$aar_path" "$release_dir/$aar_name"
 cp "$sources_path" "$release_dir/$sources_name"
 
-mkdir -p "$work_dir/javadoc"
+mkdir -p "$work_dir/javadoc" "$work_dir/sources" "$work_dir/aar"
+unzip -q "$sources_path" -d "$work_dir/sources"
+unzip -q "$aar_path" classes.jar -d "$work_dir/aar"
+mapfile -t java_sources < <(
+  find "$work_dir/sources/jissrbypass" -type f -name '*.java' | sort
+)
+if [[ ${#java_sources[@]} -eq 0 ]]; then
+  echo "No public jissrbypass Java sources were found in: $sources_path" >&2
+  exit 2
+fi
+javadoc \
+  -quiet \
+  -Xdoclint:none \
+  -encoding UTF-8 \
+  -docencoding UTF-8 \
+  -charset UTF-8 \
+  -windowtitle "Jissr Bypass Android API" \
+  -doctitle "Jissr Bypass Android API" \
+  -classpath "$work_dir/aar/classes.jar" \
+  -d "$work_dir/javadoc" \
+  "${java_sources[@]}"
 cp docs/maven/README.md "$work_dir/javadoc/README.md"
 (
   cd "$work_dir/javadoc"
-  jar --create --file "$release_dir/$javadoc_name" README.md
+  jar --create --file "$release_dir/$javadoc_name" .
 )
 
 cat >"$release_dir/$pom_name" <<EOF
@@ -79,6 +99,10 @@ cat >"$release_dir/$pom_name" <<EOF
   <name>Jissr Bypass for Android</name>
   <description>Native ECH HTTPS transport for Android applications.</description>
   <url>https://github.com/inqadh/jissr-bypass</url>
+  <organization>
+    <name>المجلس الوطني للإنقاذ</name>
+    <url>https://www.inqadh.com/</url>
+  </organization>
   <licenses>
     <license>
       <name>Apache License, Version 2.0</name>
@@ -101,6 +125,10 @@ cat >"$release_dir/$pom_name" <<EOF
     <url>https://github.com/inqadh/jissr-bypass</url>
     <tag>v$version</tag>
   </scm>
+  <issueManagement>
+    <system>GitHub Issues</system>
+    <url>https://github.com/inqadh/jissr-bypass/issues</url>
+  </issueManagement>
 </project>
 EOF
 
