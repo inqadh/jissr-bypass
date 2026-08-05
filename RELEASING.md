@@ -82,3 +82,6 @@ The protected `maven-central` GitHub environment requires:
 - `CENTRAL_TOKEN_PASSWORD`: Central Portal user-token password.
 
 The `org.jissr` namespace must be verified against `jissr.org` before upload.
+Release artifacts are signed as
+`Jissr Bypass Releases <releases@inqadh.com>`; personal administrator
+identities must not appear in published POM or signing metadata.
