@@ -1,4 +1,4 @@
-module github.com/jissr-org/jissr-bypass
+module github.com/inqadh/jissr-bypass
 
 go 1.25.0
 

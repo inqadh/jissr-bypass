@@ -2,16 +2,13 @@
 
 ## Before the first public tag
 
-1. Confirm the final GitHub organization owns `jissr-bypass`.
-2. Replace `github.com/jissr-org/jissr-bypass` if the organization differs.
-3. Verify the `org.jissr` namespace in Maven Central using the owned domain.
-4. Enable GitHub private vulnerability reporting.
-5. Create code-signing, Maven Central, and artifact-signing credentials in the
+1. Verify the `org.jissr` namespace in Maven Central using the owned domain.
+2. Enable GitHub private vulnerability reporting.
+3. Create code-signing, Maven Central, and artifact-signing credentials in the
    public repository's CI secret store.
 
-Do not publish a temporary Go module path. Published Go module versions are
-immutable and retaining the final path from the first tag avoids a permanent
-compatibility alias.
+The canonical Go module path is `github.com/inqadh/jissr-bypass`. Published Go
+module versions are immutable, so it must not be changed after the first tag.
 
 ## Candidate
 

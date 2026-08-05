@@ -1,0 +1,95 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  go:
+    name: Go tests and vet
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - run: go test -race ./...
+      - run: go vet ./...
+
+  android:
+    name: Android AAR
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - name: Build AAR
+        run: |
+          mkdir -p dist/android
+          go tool gomobile bind \
+            -target=android \
+            -androidapi 26 \
+            -o dist/android/jissr-bypass.aar \
+            ./mobile
+      - uses: actions/upload-artifact@v6
+        with:
+          name: jissr-bypass-android
+          path: dist/android/jissr-bypass.aar
+          if-no-files-found: error
+
+  apple:
+    name: Apple XCFramework
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - name: Build XCFramework
+        run: ./scripts/build-apple.sh
+      - name: Package XCFramework
+        run: |
+          ditto -c -k --sequesterRsrc --keepParent \
+            dist/apple/JissrBypass.xcframework \
+            dist/apple/JissrBypass.xcframework.zip
+      - uses: actions/upload-artifact@v6
+        with:
+          name: jissr-bypass-apple
+          path: dist/apple/JissrBypass.xcframework.zip
+          if-no-files-found: error
+
+  desktop:
+    name: Desktop executables
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - name: Build desktop matrix
+        shell: pwsh
+        run: ./scripts/build-desktop.ps1 -Version "ci-${{ github.sha }}"
+      - uses: actions/upload-artifact@v6
+        with:
+          name: jissr-bypass-desktop
+          path: dist/desktop/*
+          if-no-files-found: error

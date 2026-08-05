@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"net/http"
 
-	core "github.com/jissr-org/jissr-bypass"
+	core "github.com/inqadh/jissr-bypass"
 )
 
 // Client wraps the shared ECH transport.

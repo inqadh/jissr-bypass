@@ -23,7 +23,7 @@ import (
     "log"
     "net/http"
 
-    bypass "github.com/jissr-org/jissr-bypass"
+    bypass "github.com/inqadh/jissr-bypass"
 )
 
 func main() {
@@ -137,8 +137,9 @@ integrating it into a production application.
 - Desktop: signed Windows, macOS, and Linux CLI archives with SHA-256 checksums
   and an SBOM.
 
-No public tag should be created until the final GitHub organization and module
-path have been confirmed. Go module versions are immutable once published.
+The canonical source and Go module path are
+[`github.com/inqadh/jissr-bypass`](https://github.com/inqadh/jissr-bypass).
+Go module versions are immutable once published.
 
 ## License
 

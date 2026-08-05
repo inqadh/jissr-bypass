@@ -6,7 +6,7 @@ import (
 	"log"
 	"net/http"
 
-	bypass "github.com/jissr-org/jissr-bypass"
+	bypass "github.com/inqadh/jissr-bypass"
 )
 
 func main() {
