@@ -32,6 +32,13 @@ jobs:
         with:
           go-version-file: go.mod
           cache-dependency-path: go.sum
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v5
+        with:
+          gradle-version: "9.4.1"
       - name: Build AAR
         run: |
           mkdir -p dist/android
@@ -41,10 +48,23 @@ jobs:
             -androidapi 26 \
             -o dist/android/jissr-bypass.aar \
             ./mobile
+      - name: Test and build OkHttp adapter
+        run: |
+          gradle \
+            --no-daemon \
+            -p adapters/okhttp \
+            "-PjissrBypassAar=$GITHUB_WORKSPACE/dist/android/jissr-bypass.aar" \
+            :library:testDebugUnitTest \
+            :library:assembleRelease \
+            :library:sourceReleaseJar
       - uses: actions/upload-artifact@v6
         with:
           name: android
-          path: dist/android/jissr-bypass.aar
+          path: |
+            dist/android/jissr-bypass.aar
+            dist/android/jissr-bypass-sources.jar
+            adapters/okhttp/library/build/outputs/aar/library-release.aar
+            adapters/okhttp/library/build/libs/library-sources.jar
           if-no-files-found: error
 
   apple:
@@ -59,6 +79,13 @@ jobs:
           cache-dependency-path: go.sum
       - name: Build XCFramework
         run: bash scripts/build-apple.sh
+      - name: Test URLSession adapter
+        run: |
+          mkdir -p adapters/apple/Binaries
+          cp -R \
+            dist/apple/JissrBypass.xcframework \
+            adapters/apple/Binaries/JissrBypass.xcframework
+          swift test --package-path adapters/apple
       - name: Package XCFramework
         run: |
           ditto -c -k --sequesterRsrc --keepParent \

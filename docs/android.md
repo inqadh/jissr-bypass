@@ -44,6 +44,28 @@ dependencies {
 }
 ```
 
+For an existing OkHttp or Retrofit application, add the optional adapter with
+the same version:
+
+```kotlin
+dependencies {
+    implementation("org.jissr:jissr-bypass-android:0.1.0-rc.3")
+    implementation("org.jissr:jissr-bypass-okhttp:0.1.0-rc.3")
+}
+```
+
+Patch the client once at the application's composition root:
+
+```kotlin
+val routedClient = JissrBypassInterceptor.patch(
+    base = existingOkHttpClient,
+    protectedHosts = listOf("api.example.com")
+)
+```
+
+Retrofit service interfaces and endpoint call sites can remain unchanged. See
+the [adapter compatibility contract](adapters.md).
+
 Groovy projects use:
 
 ```groovy

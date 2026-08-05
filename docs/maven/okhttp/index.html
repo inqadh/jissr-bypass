@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Jissr Bypass OkHttp API</title>
+</head>
+<body>
+  <main>
+    <h1>Jissr Bypass OkHttp API</h1>
+    <h2>JissrBypassInterceptor</h2>
+    <p>
+      An OkHttp application interceptor that routes exact configured HTTPS
+      hosts through the Jissr Bypass native client.
+    </p>
+    <h3>patch</h3>
+    <pre>JissrBypassInterceptor.patch(base, protectedHosts, client, maxRequestBytes)</pre>
+    <p>
+      Clones the base OkHttp client, appends the routing interceptor, and
+      returns the new client. The base client is not mutated.
+    </p>
+    <h3>Compatibility</h3>
+    <p>
+      Bounded request and response bodies are supported. WebSockets, duplex
+      bodies, one-shot bodies, and streaming responses are not supported.
+    </p>
+  </main>
+</body>
+</html>

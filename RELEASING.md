@@ -57,10 +57,17 @@ the CLI must verify the versioned nonce challenge.
 7. Upload the XCFramework ZIP and update its Swift Package checksum.
 8. Upload signed desktop archives, checksums, and SBOMs.
 9. Re-run the public canary examples from a clean consumer project.
+10. Publish the checksum-pinned Swift wrapper repository from the exact
+    XCFramework ZIP attached to the GitHub release.
 
 For Android, also verify that the Maven Javadoc JAR contains generated
 `jissrbypass` HTML pages rather than only a documentation pointer, and build a
-clean Gradle consumer against the exact published coordinate.
+clean Gradle consumer against both exact published coordinates:
+
+```text
+org.jissr:jissr-bypass-android:<version>
+org.jissr:jissr-bypass-okhttp:<version>
+```
 
 ## Maven Central
 

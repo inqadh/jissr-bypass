@@ -170,9 +170,11 @@ Drag `dist/apple/JissrBypass.xcframework` into the Xcode project, select the app
 target, and use **Embed & Sign**. Add `import Jissrbypass` in Swift sources that
 call the binding.
 
-The planned public distribution is a checksum-pinned binary target through
-Swift Package Manager. Until it is published, pin and checksum the XCFramework
-from the release.
+Public distribution uses the organization-owned
+`https://github.com/inqadh/jissr-bypass-swift` package. It pins the exact
+XCFramework release asset by checksum and includes the optional URLSession
+adapter. Until the matching package tag is published, pin and checksum the
+XCFramework directly from the core release.
 
 ### Go applications on Windows, macOS, and Linux
 
