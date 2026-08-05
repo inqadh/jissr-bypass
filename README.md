@@ -98,7 +98,21 @@ To build the AAR locally on Windows:
 ```
 
 See the [complete Android guide](docs/android.md) and
-[sample Activity](examples/android/MainActivity.kt).
+[sample application](examples/android).
+
+Applications already using OkHttp or Retrofit can patch one central client
+with the optional adapter:
+
+```kotlin
+val patched = JissrBypassInterceptor.patch(
+    base = existingOkHttpClient,
+    protectedHosts = listOf("api.example.com")
+)
+```
+
+The adapter will be published separately as
+`org.jissr:jissr-bypass-okhttp:<version>`, so the core AAR remains
+dependency-free. See [client adapters](docs/adapters.md).
 
 ## Apple platforms
 
@@ -111,8 +125,11 @@ On macOS with Xcode installed:
 This creates `dist/apple/JissrBypass.xcframework` containing iOS device,
 simulator, and macOS slices. A Swift example is in `examples/apple`.
 
-The public release will expose the XCFramework through Swift Package Manager
-with a checksum-pinned GitHub Release artifact.
+The public release exposes the XCFramework through the organization-owned
+`inqadh/jissr-bypass-swift` package, with a checksum-pinned GitHub Release
+artifact. It also includes an optional URLSession adapter that recreates one
+central session without changing existing `URLRequest` construction. See the
+[Swift package release process](docs/swift-package.md).
 
 ## Canary protocol
 
@@ -150,6 +167,8 @@ integrating it into a production application.
 - Go: tagged module and documentation on `pkg.go.dev`.
 - Android: signed AAR on Maven Central under `org.jissr`.
 - Apple: checksum-pinned XCFramework through Swift Package Manager.
+- Optional adapters: OkHttp/Retrofit, URLSession, and Go `http.Client`
+  host routing.
 - Desktop: signed Windows, macOS, and Linux CLI archives with SHA-256 checksums
   and an SBOM.
 

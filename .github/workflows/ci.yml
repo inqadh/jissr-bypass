@@ -42,6 +42,9 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
+      - uses: gradle/actions/setup-gradle@v5
+        with:
+          gradle-version: "9.4.1"
       - name: Build AAR
         run: |
           mkdir -p dist/android
@@ -51,6 +54,15 @@ jobs:
             -androidapi 26 \
             -o dist/android/jissr-bypass.aar \
             ./mobile
+      - name: Test and build OkHttp adapter
+        run: |
+          gradle \
+            --no-daemon \
+            -p adapters/okhttp \
+            "-PjissrBypassAar=$GITHUB_WORKSPACE/dist/android/jissr-bypass.aar" \
+            :library:testDebugUnitTest \
+            :library:assembleRelease \
+            :library:sourceReleaseJar
       - name: Validate Maven Central bundle
         run: |
           gpg --batch --passphrase '' --quick-generate-key \
@@ -63,7 +75,9 @@ jobs:
             0.0.0-ci \
             dist/android/jissr-bypass.aar \
             dist/android/jissr-bypass-sources.jar \
-            dist/maven-central/central-bundle.zip
+            dist/maven-central/central-bundle.zip \
+            adapters/okhttp/library/build/outputs/aar/library-release.aar \
+            adapters/okhttp/library/build/libs/library-sources.jar
           unzip -q dist/maven-central/central-bundle.zip \
             -d dist/maven-central/verify
           release_dir=dist/maven-central/verify/org/jissr/jissr-bypass-android/0.0.0-ci
@@ -71,6 +85,15 @@ jobs:
           test -f "$release_dir/jissr-bypass-android-0.0.0-ci-sources.jar"
           test -f "$release_dir/jissr-bypass-android-0.0.0-ci-javadoc.jar"
           test -f "$release_dir/jissr-bypass-android-0.0.0-ci.pom"
+          okhttp_dir=dist/maven-central/verify/org/jissr/jissr-bypass-okhttp/0.0.0-ci
+          test -f "$okhttp_dir/jissr-bypass-okhttp-0.0.0-ci.aar"
+          test -f "$okhttp_dir/jissr-bypass-okhttp-0.0.0-ci-sources.jar"
+          test -f "$okhttp_dir/jissr-bypass-okhttp-0.0.0-ci-javadoc.jar"
+          test -f "$okhttp_dir/jissr-bypass-okhttp-0.0.0-ci.pom"
+          grep -q '<artifactId>jissr-bypass-android</artifactId>' \
+            "$okhttp_dir/jissr-bypass-okhttp-0.0.0-ci.pom"
+          grep -q '<artifactId>okhttp</artifactId>' \
+            "$okhttp_dir/jissr-bypass-okhttp-0.0.0-ci.pom"
           unzip -q \
             "$release_dir/jissr-bypass-android-0.0.0-ci-javadoc.jar" \
             -d dist/maven-central/javadoc
@@ -80,7 +103,13 @@ jobs:
             "$release_dir/jissr-bypass-android-0.0.0-ci.pom"
           grep -q '<issueManagement>' \
             "$release_dir/jissr-bypass-android-0.0.0-ci.pom"
-          for artifact in "$release_dir"/*.aar "$release_dir"/*.jar "$release_dir"/*.pom; do
+          for artifact in \
+            "$release_dir"/*.aar \
+            "$release_dir"/*.jar \
+            "$release_dir"/*.pom \
+            "$okhttp_dir"/*.aar \
+            "$okhttp_dir"/*.jar \
+            "$okhttp_dir"/*.pom; do
             gpg --batch --verify "$artifact.asc" "$artifact"
           done
       - uses: actions/upload-artifact@v6
@@ -89,6 +118,8 @@ jobs:
           path: |
             dist/android/jissr-bypass.aar
             dist/android/jissr-bypass-sources.jar
+            adapters/okhttp/library/build/outputs/aar/library-release.aar
+            adapters/okhttp/library/build/libs/library-sources.jar
           if-no-files-found: error
 
   android-consumer:
@@ -120,6 +151,13 @@ jobs:
           cache-dependency-path: go.sum
       - name: Build XCFramework
         run: bash scripts/build-apple.sh
+      - name: Test URLSession adapter
+        run: |
+          mkdir -p adapters/apple/Binaries
+          cp -R \
+            dist/apple/JissrBypass.xcframework \
+            adapters/apple/Binaries/JissrBypass.xcframework
+          swift test --package-path adapters/apple
       - name: Package XCFramework
         run: |
           ditto -c -k --sequesterRsrc --keepParent \

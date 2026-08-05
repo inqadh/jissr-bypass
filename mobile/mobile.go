@@ -18,6 +18,7 @@ type Client struct {
 // Response is a gomobile-compatible HTTP response.
 type Response struct {
 	statusCode int
+	protocol   string
 	body       []byte
 	headers    string
 }
@@ -28,6 +29,14 @@ func (response *Response) GetStatusCode() int {
 		return 0
 	}
 	return response.statusCode
+}
+
+// GetProtocol returns the negotiated HTTP protocol, for example HTTP/2.0.
+func (response *Response) GetProtocol() string {
+	if response == nil {
+		return ""
+	}
+	return response.protocol
 }
 
 // GetBody returns the response body.
@@ -80,6 +89,7 @@ func (client *Client) Execute(method, url string, body []byte, headersJSON strin
 	}
 	return &Response{
 		statusCode: result.StatusCode,
+		protocol:   result.Protocol,
 		body:       result.Body,
 		headers:    string(encodedHeaders),
 	}, nil

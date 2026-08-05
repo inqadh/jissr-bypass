@@ -71,6 +71,7 @@ type Client struct {
 // Headers is a defensive copy and Body is limited to 4 MiB.
 type Result struct {
 	StatusCode int
+	Protocol   string
 	Headers    http.Header
 	Body       []byte
 }
@@ -177,6 +178,8 @@ func (c *Client) Do(request *http.Request) (*http.Response, error) {
 	if err != nil {
 		return nil, err
 	}
+	request = request.Clone(request.Context())
+	request.Header = request.Header.Clone()
 	resolution, err := c.Resolve(request.Context(), host)
 	if err != nil {
 		return nil, fmt.Errorf("resolve %s: %w", host, err)
@@ -235,6 +238,7 @@ func (c *Client) Execute(method, rawURL string, body []byte, headers http.Header
 	}
 	return &Result{
 		StatusCode: response.StatusCode,
+		Protocol:   response.Proto,
 		Headers:    response.Header.Clone(),
 		Body:       responseBody,
 	}, nil

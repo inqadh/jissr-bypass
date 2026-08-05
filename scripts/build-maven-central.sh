@@ -2,10 +2,10 @@
 set -euo pipefail
 
 usage() {
-  echo "Usage: $0 <version> <aar> <sources-jar> <output-zip>" >&2
+  echo "Usage: $0 <version> <core-aar> <core-sources-jar> <output-zip> [<okhttp-aar> <okhttp-sources-jar>]" >&2
 }
 
-if [[ $# -ne 4 ]]; then
+if [[ $# -ne 4 && $# -ne 6 ]]; then
   usage
   exit 2
 fi
@@ -14,6 +14,8 @@ version="$1"
 aar_path="$2"
 sources_path="$3"
 output_path="$4"
+okhttp_aar_path="${5:-}"
+okhttp_sources_path="${6:-}"
 
 if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]] ||
    [[ "$version" == *-SNAPSHOT ]]; then
@@ -67,6 +69,14 @@ mapfile -t java_sources < <(
 )
 if [[ ${#java_sources[@]} -eq 0 ]]; then
   echo "No public jissrbypass Java sources were found in: $sources_path" >&2
+  exit 2
+fi
+if [[ -n "$okhttp_aar_path" && ! -f "$okhttp_aar_path" ]]; then
+  echo "OkHttp adapter AAR not found: $okhttp_aar_path" >&2
+  exit 2
+fi
+if [[ -n "$okhttp_sources_path" && ! -f "$okhttp_sources_path" ]]; then
+  echo "OkHttp adapter sources JAR not found: $okhttp_sources_path" >&2
   exit 2
 fi
 javadoc \
@@ -132,6 +142,96 @@ cat >"$release_dir/$pom_name" <<EOF
 </project>
 EOF
 
+primary_files=(
+  "$release_dir/$aar_name"
+  "$release_dir/$sources_name"
+  "$release_dir/$javadoc_name"
+  "$release_dir/$pom_name"
+)
+
+if [[ -n "$okhttp_aar_path" ]]; then
+  okhttp_artifact_id="jissr-bypass-okhttp"
+  okhttp_prefix="$okhttp_artifact_id-$version"
+  okhttp_release_dir="$work_dir/repository/$group_path/$okhttp_artifact_id/$version"
+  mkdir -p "$okhttp_release_dir" "$work_dir/okhttp-javadoc"
+
+  cp "$okhttp_aar_path" "$okhttp_release_dir/$okhttp_prefix.aar"
+  cp "$okhttp_sources_path" "$okhttp_release_dir/$okhttp_prefix-sources.jar"
+  cp docs/maven/okhttp/README.md "$work_dir/okhttp-javadoc/README.md"
+  cp docs/maven/okhttp/index.html "$work_dir/okhttp-javadoc/index.html"
+  (
+    cd "$work_dir/okhttp-javadoc"
+    jar --create \
+      --file "$okhttp_release_dir/$okhttp_prefix-javadoc.jar" \
+      .
+  )
+
+  cat >"$okhttp_release_dir/$okhttp_prefix.pom" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>$group_id</groupId>
+  <artifactId>$okhttp_artifact_id</artifactId>
+  <version>$version</version>
+  <packaging>aar</packaging>
+  <name>Jissr Bypass for OkHttp and Retrofit</name>
+  <description>Optional exact-host routing adapter for OkHttp and Retrofit applications.</description>
+  <url>https://github.com/inqadh/jissr-bypass</url>
+  <organization>
+    <name>المجلس الوطني للإنقاذ</name>
+    <url>https://www.inqadh.com/</url>
+  </organization>
+  <licenses>
+    <license>
+      <name>Apache License, Version 2.0</name>
+      <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+      <distribution>repo</distribution>
+    </license>
+  </licenses>
+  <developers>
+    <developer>
+      <id>inqadh</id>
+      <name>المجلس الوطني للإنقاذ</name>
+      <email>releases@inqadh.com</email>
+      <organization>المجلس الوطني للإنقاذ</organization>
+      <organizationUrl>https://www.inqadh.com/</organizationUrl>
+    </developer>
+  </developers>
+  <scm>
+    <connection>scm:git:https://github.com/inqadh/jissr-bypass.git</connection>
+    <developerConnection>scm:git:ssh://git@github.com/inqadh/jissr-bypass.git</developerConnection>
+    <url>https://github.com/inqadh/jissr-bypass</url>
+    <tag>v$version</tag>
+  </scm>
+  <issueManagement>
+    <system>GitHub Issues</system>
+    <url>https://github.com/inqadh/jissr-bypass/issues</url>
+  </issueManagement>
+  <dependencies>
+    <dependency>
+      <groupId>org.jissr</groupId>
+      <artifactId>jissr-bypass-android</artifactId>
+      <version>$version</version>
+    </dependency>
+    <dependency>
+      <groupId>com.squareup.okhttp3</groupId>
+      <artifactId>okhttp</artifactId>
+      <version>5.3.0</version>
+    </dependency>
+  </dependencies>
+</project>
+EOF
+
+  primary_files+=(
+    "$okhttp_release_dir/$okhttp_prefix.aar"
+    "$okhttp_release_dir/$okhttp_prefix-sources.jar"
+    "$okhttp_release_dir/$okhttp_prefix-javadoc.jar"
+    "$okhttp_release_dir/$okhttp_prefix.pom"
+  )
+fi
+
 export GNUPGHOME="$work_dir/gnupg"
 mkdir -m 700 "$GNUPGHOME"
 printf '%s' "$MAVEN_SIGNING_KEY_B64" | base64 --decode >"$work_dir/signing-key.asc"
@@ -144,13 +244,6 @@ if [[ -z "$signing_fingerprint" ]]; then
   echo "No signing key was imported." >&2
   exit 2
 fi
-
-primary_files=(
-  "$release_dir/$aar_name"
-  "$release_dir/$sources_name"
-  "$release_dir/$javadoc_name"
-  "$release_dir/$pom_name"
-)
 
 for artifact in "${primary_files[@]}"; do
   gpg_args=(

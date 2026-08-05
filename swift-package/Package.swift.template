@@ -1,0 +1,35 @@
+// swift-tools-version: 5.10
+import PackageDescription
+
+let package = Package(
+    name: "JissrBypass",
+    platforms: [
+        .iOS(.v15),
+        .macOS(.v12),
+    ],
+    products: [
+        .library(
+            name: "Jissrbypass",
+            targets: ["Jissrbypass"]
+        ),
+        .library(
+            name: "JissrBypassURLSession",
+            targets: ["JissrBypassURLSession"]
+        ),
+    ],
+    targets: [
+        .binaryTarget(
+            name: "Jissrbypass",
+            url: "https://github.com/inqadh/jissr-bypass/releases/download/v@VERSION@/JissrBypass.xcframework.zip",
+            checksum: "@CHECKSUM@"
+        ),
+        .target(
+            name: "JissrBypassURLSession",
+            dependencies: ["Jissrbypass"]
+        ),
+        .testTarget(
+            name: "JissrBypassURLSessionTests",
+            dependencies: ["JissrBypassURLSession"]
+        ),
+    ]
+)

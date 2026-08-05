@@ -38,6 +38,9 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
+      - uses: gradle/actions/setup-gradle@v5
+        with:
+          gradle-version: "9.4.1"
       - name: Verify tag and version
         shell: bash
         run: |
@@ -57,6 +60,15 @@ jobs:
             -androidapi 26 \
             -o dist/android/jissr-bypass.aar \
             ./mobile
+      - name: Test and build OkHttp adapter
+        run: |
+          gradle \
+            --no-daemon \
+            -p adapters/okhttp \
+            "-PjissrBypassAar=$GITHUB_WORKSPACE/dist/android/jissr-bypass.aar" \
+            :library:testDebugUnitTest \
+            :library:assembleRelease \
+            :library:sourceReleaseJar
       - name: Build signed Central bundle
         env:
           MAVEN_SIGNING_KEY_B64: ${{ secrets.MAVEN_SIGNING_KEY_B64 }}
@@ -66,7 +78,9 @@ jobs:
             "${{ inputs.version }}" \
             dist/android/jissr-bypass.aar \
             dist/android/jissr-bypass-sources.jar \
-            "dist/maven-central/jissr-bypass-android-${{ inputs.version }}.zip"
+            "dist/maven-central/jissr-bypass-${{ inputs.version }}.zip" \
+            adapters/okhttp/library/build/outputs/aar/library-release.aar \
+            adapters/okhttp/library/build/libs/library-sources.jar
       - uses: actions/upload-artifact@v6
         with:
           name: maven-central-${{ inputs.version }}
@@ -97,7 +111,7 @@ jobs:
           CENTRAL_PUBLISHING_TYPE: USER_MANAGED
         run: |
           bash scripts/upload-maven-central.sh \
-            "dist/maven-central/jissr-bypass-android-${{ inputs.version }}.zip"
+            "dist/maven-central/jissr-bypass-${{ inputs.version }}.zip"
       - name: Deployment summary
         run: |
           {

@@ -7,6 +7,11 @@ candidates and may change before the stable release.
 
 ## Unreleased
 
+- Added exact-host routing for existing Go `http.Client` configurations.
+- Added an optional OkHttp/Retrofit adapter with bounded body handling.
+- Added an optional URLSession adapter for centrally recreated Apple sessions.
+- Added the checksum-pinned Swift package wrapper preparation pipeline.
+- Added the negotiated HTTP protocol to mobile response bindings.
 - Added complete Android installation, API, diagnostics, shrinking, and
   release-verification documentation.
 - Added generated HTML API reference to the Maven Javadoc artifact.
