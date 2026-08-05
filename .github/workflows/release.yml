@@ -35,6 +35,7 @@ jobs:
       - name: Build AAR
         run: |
           mkdir -p dist/android
+          go tool gomobile init
           go tool gomobile bind \
             -target=android \
             -androidapi 26 \
@@ -57,7 +58,7 @@ jobs:
           go-version-file: go.mod
           cache-dependency-path: go.sum
       - name: Build XCFramework
-        run: ./scripts/build-apple.sh
+        run: bash scripts/build-apple.sh
       - name: Package XCFramework
         run: |
           ditto -c -k --sequesterRsrc --keepParent \

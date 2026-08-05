@@ -7,6 +7,7 @@ OUTPUT="${1:-$ROOT/dist/apple/JissrBypass.xcframework}"
 mkdir -p "$(dirname "$OUTPUT")"
 cd "$ROOT"
 go test ./...
+go tool gomobile init
 go tool gomobile bind \
   -target=ios,iossimulator,macos \
   -iosversion=15.0 \

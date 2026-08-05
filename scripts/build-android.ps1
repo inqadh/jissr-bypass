@@ -34,6 +34,8 @@ Push-Location $root
 try {
     go test ./...
     if ($LASTEXITCODE -ne 0) { throw "Go tests failed." }
+    go tool gomobile init
+    if ($LASTEXITCODE -ne 0) { throw "gomobile initialization failed." }
     go tool gomobile bind -target=android -androidapi 26 -o $Output ./mobile
     if ($LASTEXITCODE -ne 0) { throw "Android AAR build failed." }
     $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $Output).Hash.ToLowerInvariant()
