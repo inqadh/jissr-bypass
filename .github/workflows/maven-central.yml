@@ -87,7 +87,7 @@ jobs:
             "dist/maven-central/jissr-bypass-${{ inputs.version }}.zip" \
             adapters/okhttp/library/build/outputs/aar/library-release.aar \
             dist/android/jissr-bypass-okhttp-sources.jar
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         with:
           name: maven-central-${{ inputs.version }}
           path: dist/maven-central/*.zip

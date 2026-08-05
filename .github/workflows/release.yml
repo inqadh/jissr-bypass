@@ -63,7 +63,7 @@ jobs:
           )"
           test -n "$sources_jar"
           cp "$sources_jar" dist/android/jissr-bypass-okhttp-sources.jar
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         with:
           name: android
           path: |
@@ -97,7 +97,7 @@ jobs:
           ditto -c -k --sequesterRsrc --keepParent \
             dist/apple/JissrBypass.xcframework \
             dist/apple/JissrBypass.xcframework.zip
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         with:
           name: apple
           path: dist/apple/JissrBypass.xcframework.zip
@@ -116,7 +116,7 @@ jobs:
       - name: Build desktop matrix
         shell: pwsh
         run: ./scripts/build-desktop.ps1 -Version "${{ github.ref_name }}"
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         with:
           name: desktop
           path: dist/desktop/*

@@ -118,7 +118,7 @@ jobs:
             "$okhttp_dir"/*.pom; do
             gpg --batch --verify "$artifact.asc" "$artifact"
           done
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         with:
           name: jissr-bypass-android
           path: |
@@ -169,7 +169,7 @@ jobs:
           ditto -c -k --sequesterRsrc --keepParent \
             dist/apple/JissrBypass.xcframework \
             dist/apple/JissrBypass.xcframework.zip
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         with:
           name: jissr-bypass-apple
           path: dist/apple/JissrBypass.xcframework.zip
@@ -188,7 +188,7 @@ jobs:
       - name: Build desktop matrix
         shell: pwsh
         run: ./scripts/build-desktop.ps1 -Version "ci-${{ github.sha }}"
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         with:
           name: jissr-bypass-desktop
           path: dist/desktop/*
