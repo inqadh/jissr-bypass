@@ -9,19 +9,17 @@ struct BypassResponse {
 
 func fetchWithJissrBypass() async throws -> BypassResponse {
     try await Task.detached(priority: .userInitiated) {
-        var error: NSError?
-        let response = JissrbypassNewClient().execute(
+        guard let client = JissrbypassNewClient() else {
+            throw NSError(domain: "JissrBypass", code: -1)
+        }
+        let response = try client.execute(
             "GET",
             url: "https://blocked.yusef.ren/v1/health",
             body: Data(),
-            headersJSON: #"{"Accept":"application/json"}"#,
-            error: &error
+            headersJSON: #"{"Accept":"application/json"}"#
         )
-        if let error {
-            throw error
-        }
         guard let response else {
-            throw NSError(domain: "JissrBypass", code: -1)
+            throw NSError(domain: "JissrBypass", code: -2)
         }
         return BypassResponse(
             statusCode: Int(response.getStatusCode()),

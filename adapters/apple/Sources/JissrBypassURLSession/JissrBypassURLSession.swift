@@ -2,6 +2,7 @@ import Foundation
 import JissrBypass
 
 public enum JissrBypassURLSessionError: Error {
+    case clientInitializationFailed
     case invalidProtectedHost
     case responseUnavailable
     case streamedRequestBodyUnsupported
@@ -19,7 +20,9 @@ public enum JissrBypassURLSession {
             throw JissrBypassURLSessionError.invalidProtectedHost
         }
 
-        let nativeClient = JissrbypassNewClient()
+        guard let nativeClient = JissrbypassNewClient() else {
+            throw JissrBypassURLSessionError.clientInitializationFailed
+        }
         JissrBypassURLProtocol.configure(
             hosts: hosts,
             executor: { request in
@@ -27,17 +30,12 @@ public enum JissrBypassURLSession {
                     throw JissrBypassURLSessionError.streamedRequestBodyUnsupported
                 }
                 let headers = try encodeHeaders(request.allHTTPHeaderFields ?? [:])
-                var error: NSError?
-                let response = nativeClient.execute(
+                let response = try nativeClient.execute(
                     request.httpMethod ?? "GET",
                     url: request.url?.absoluteString ?? "",
                     body: request.httpBody ?? Data(),
-                    headersJSON: headers,
-                    error: &error
+                    headersJSON: headers
                 )
-                if let error {
-                    throw error
-                }
                 guard let response else {
                     throw JissrBypassURLSessionError.responseUnavailable
                 }

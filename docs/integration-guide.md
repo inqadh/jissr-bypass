@@ -286,19 +286,17 @@ func loadProfile(accessToken: String) async throws -> BypassHTTPResponse {
         let headers = """
         {"Authorization":"Bearer \(accessToken)","Accept":"application/json"}
         """
-        var error: NSError?
-        let response = JissrbypassNewClient().execute(
+        guard let client = JissrbypassNewClient() else {
+            throw NSError(domain: "JissrBypass", code: -1)
+        }
+        let response = try client.execute(
             "GET",
             url: "https://api.example.com/v1/profile",
             body: Data(),
-            headersJSON: headers,
-            error: &error
+            headersJSON: headers
         )
-        if let error {
-            throw error
-        }
         guard let response else {
-            throw NSError(domain: "JissrBypass", code: -1)
+            throw NSError(domain: "JissrBypass", code: -2)
         }
         return BypassHTTPResponse(
             statusCode: Int(response.getStatusCode()),
@@ -309,9 +307,8 @@ func loadProfile(accessToken: String) async throws -> BypassHTTPResponse {
 }
 ```
 
-Generated Swift names can vary slightly by the gomobile version. Treat the
-generated framework header as the source of truth if Xcode suggests a different
-argument label.
+The published framework is the source of truth for the generated Swift
+signatures.
 
 ### Go: authenticated request
 
