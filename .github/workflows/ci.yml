@@ -29,7 +29,7 @@ jobs:
       - run: go vet ./...
 
   android:
-    name: Android AAR
+    name: Android AAR and Maven bundle
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -38,6 +38,10 @@ jobs:
         with:
           go-version-file: go.mod
           cache-dependency-path: go.sum
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
       - name: Build AAR
         run: |
           mkdir -p dist/android
@@ -47,10 +51,35 @@ jobs:
             -androidapi 26 \
             -o dist/android/jissr-bypass.aar \
             ./mobile
+      - name: Validate Maven Central bundle
+        run: |
+          gpg --batch --passphrase '' --quick-generate-key \
+            'Jissr Bypass CI <ci@example.invalid>' rsa2048 sign 1d
+          export MAVEN_SIGNING_KEY_B64
+          MAVEN_SIGNING_KEY_B64="$(
+            gpg --batch --armor --export-secret-keys | base64 -w0
+          )"
+          bash scripts/build-maven-central.sh \
+            0.0.0-ci \
+            dist/android/jissr-bypass.aar \
+            dist/android/jissr-bypass-sources.jar \
+            dist/maven-central/central-bundle.zip
+          unzip -q dist/maven-central/central-bundle.zip \
+            -d dist/maven-central/verify
+          release_dir=dist/maven-central/verify/org/jissr/jissr-bypass-android/0.0.0-ci
+          test -f "$release_dir/jissr-bypass-android-0.0.0-ci.aar"
+          test -f "$release_dir/jissr-bypass-android-0.0.0-ci-sources.jar"
+          test -f "$release_dir/jissr-bypass-android-0.0.0-ci-javadoc.jar"
+          test -f "$release_dir/jissr-bypass-android-0.0.0-ci.pom"
+          for artifact in "$release_dir"/*.aar "$release_dir"/*.jar "$release_dir"/*.pom; do
+            gpg --batch --verify "$artifact.asc" "$artifact"
+          done
       - uses: actions/upload-artifact@v6
         with:
           name: jissr-bypass-android
-          path: dist/android/jissr-bypass.aar
+          path: |
+            dist/android/jissr-bypass.aar
+            dist/android/jissr-bypass-sources.jar
           if-no-files-found: error
 
   apple:

@@ -1,0 +1,109 @@
+name: Maven Central
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Immutable source tag (for example v0.1.0-rc.1)
+        required: true
+        type: string
+      version:
+        description: Maven version without the v prefix
+        required: true
+        type: string
+      upload:
+        description: Upload for Central validation
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build signed Maven bundle
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: maven-central
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.tag }}
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Verify tag and version
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${{ inputs.tag }}" = "v${{ inputs.version }}"
+          test "$(git describe --tags --exact-match)" = "${{ inputs.tag }}"
+      - name: Test
+        run: |
+          go test -race ./...
+          go vet ./...
+      - name: Build Android AAR
+        run: |
+          mkdir -p dist/android
+          go tool gomobile init
+          go tool gomobile bind \
+            -target=android \
+            -androidapi 26 \
+            -o dist/android/jissr-bypass.aar \
+            ./mobile
+      - name: Build signed Central bundle
+        env:
+          MAVEN_SIGNING_KEY_B64: ${{ secrets.MAVEN_SIGNING_KEY_B64 }}
+          MAVEN_SIGNING_PASSWORD: ${{ secrets.MAVEN_SIGNING_PASSWORD }}
+        run: |
+          bash scripts/build-maven-central.sh \
+            "${{ inputs.version }}" \
+            dist/android/jissr-bypass.aar \
+            dist/android/jissr-bypass-sources.jar \
+            "dist/maven-central/jissr-bypass-android-${{ inputs.version }}.zip"
+      - uses: actions/upload-artifact@v6
+        with:
+          name: maven-central-${{ inputs.version }}
+          path: dist/maven-central/*.zip
+          if-no-files-found: error
+          retention-days: 30
+
+  upload:
+    name: Upload for Central validation
+    if: ${{ inputs.upload }}
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: maven-central
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.tag }}
+      - uses: actions/download-artifact@v6
+        with:
+          name: maven-central-${{ inputs.version }}
+          path: dist/maven-central
+      - name: Upload user-managed deployment
+        id: central
+        env:
+          CENTRAL_TOKEN_USERNAME: ${{ secrets.CENTRAL_TOKEN_USERNAME }}
+          CENTRAL_TOKEN_PASSWORD: ${{ secrets.CENTRAL_TOKEN_PASSWORD }}
+          CENTRAL_PUBLISHING_TYPE: USER_MANAGED
+        run: |
+          bash scripts/upload-maven-central.sh \
+            "dist/maven-central/jissr-bypass-android-${{ inputs.version }}.zip"
+      - name: Deployment summary
+        run: |
+          {
+            echo "### Maven Central validation"
+            echo
+            echo "Deployment ID: \`${{ steps.central.outputs.deployment_id }}\`"
+            echo
+            echo "The deployment is user-managed and has not been made public."
+          } >>"$GITHUB_STEP_SUMMARY"
