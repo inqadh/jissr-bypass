@@ -184,7 +184,7 @@ from the release.
 Add the module:
 
 ```sh
-go get github.com/jissr-org/jissr-bypass@<version>
+go get github.com/inqadh/jissr-bypass@<version>
 ```
 
 Do not use `@latest` in a reproducible release. Pin a reviewed semantic version.
@@ -328,7 +328,7 @@ import (
     "io"
     "net/http"
 
-    bypass "github.com/jissr-org/jissr-bypass"
+    bypass "github.com/inqadh/jissr-bypass"
 )
 
 func LoadProfile(ctx context.Context, token string) ([]byte, error) {

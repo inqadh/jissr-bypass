@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"os"
 
-	bypass "github.com/jissr-org/jissr-bypass"
+	bypass "github.com/inqadh/jissr-bypass"
 )
 
 func main() {
