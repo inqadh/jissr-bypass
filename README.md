@@ -78,11 +78,14 @@ check(response.statusCode in 200L..299L)
 Network calls are blocking and must run on a background dispatcher. The
 complete sample is in `examples/android`.
 
-The planned public coordinate is:
+The Maven Central coordinate is:
 
 ```kotlin
 implementation("org.jissr:jissr-bypass-android:0.1.0")
 ```
+
+Use a published release version in place of `0.1.0`. Release candidates retain
+their suffix, for example `0.1.0-rc.1`.
 
 ## Apple platforms
 

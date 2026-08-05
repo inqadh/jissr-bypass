@@ -57,3 +57,28 @@ the CLI must verify the versioned nonce challenge.
 7. Upload the XCFramework ZIP and update its Swift Package checksum.
 8. Upload signed desktop archives, checksums, and SBOMs.
 9. Re-run the public canary examples from a clean consumer project.
+
+## Maven Central
+
+Android is published as:
+
+```text
+org.jissr:jissr-bypass-android:<version>
+```
+
+Maven Central components are immutable. Run the `Maven Central` workflow
+manually with a tag and the same version without the `v` prefix. Keep `upload`
+disabled to build and inspect the signed bundle only.
+
+When `upload` is enabled, the workflow submits a `USER_MANAGED` deployment. It
+waits for Central validation but does not make the component public. Inspect
+the validated deployment in the Central Portal before selecting **Publish**.
+
+The protected `maven-central` GitHub environment requires:
+
+- `MAVEN_SIGNING_KEY_B64`: base64-encoded ASCII-armored PGP private key;
+- `MAVEN_SIGNING_PASSWORD`: private-key passphrase, if one is set;
+- `CENTRAL_TOKEN_USERNAME`: Central Portal user-token username; and
+- `CENTRAL_TOKEN_PASSWORD`: Central Portal user-token password.
+
+The `org.jissr` namespace must be verified against `jissr.org` before upload.
