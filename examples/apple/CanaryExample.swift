@@ -18,9 +18,6 @@ func fetchWithJissrBypass() async throws -> BypassResponse {
             body: Data(),
             headersJSON: #"{"Accept":"application/json"}"#
         )
-        guard let response else {
-            throw NSError(domain: "JissrBypass", code: -2)
-        }
         return BypassResponse(
             statusCode: Int(response.getStatusCode()),
             body: response.getBody() ?? Data(),

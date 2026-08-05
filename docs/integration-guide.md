@@ -295,9 +295,6 @@ func loadProfile(accessToken: String) async throws -> BypassHTTPResponse {
             body: Data(),
             headersJSON: headers
         )
-        guard let response else {
-            throw NSError(domain: "JissrBypass", code: -2)
-        }
         return BypassHTTPResponse(
             statusCode: Int(response.getStatusCode()),
             body: response.getBody() ?? Data(),

@@ -4,7 +4,6 @@ import JissrBypass
 public enum JissrBypassURLSessionError: Error {
     case clientInitializationFailed
     case invalidProtectedHost
-    case responseUnavailable
     case streamedRequestBodyUnsupported
 }
 
@@ -36,9 +35,6 @@ public enum JissrBypassURLSession {
                     body: request.httpBody ?? Data(),
                     headersJSON: headers
                 )
-                guard let response else {
-                    throw JissrBypassURLSessionError.responseUnavailable
-                }
                 return AdapterResponse(
                     statusCode: Int(response.getStatusCode()),
                     headersJSON: response.getHeadersJSON(),
