@@ -34,7 +34,7 @@ Developers then add:
 https://github.com/inqadh/jissr-bypass-swift
 ```
 
-The package exposes both the raw `Jissrbypass` binary module and the
+The package exposes both the raw `JissrBypass` binary module and the
 `JissrBypassURLSession` adapter.
 
 Never calculate the checksum from a locally rebuilt archive when publishing

@@ -63,6 +63,12 @@ jobs:
             :library:testDebugUnitTest \
             :library:assembleRelease \
             :library:sourceReleaseJar
+          sources_jar="$(
+            find adapters/okhttp/library/build \
+              -type f -name '*sources*.jar' -print -quit
+          )"
+          test -n "$sources_jar"
+          cp "$sources_jar" dist/android/jissr-bypass-okhttp-sources.jar
       - name: Validate Maven Central bundle
         run: |
           gpg --batch --passphrase '' --quick-generate-key \
@@ -77,7 +83,7 @@ jobs:
             dist/android/jissr-bypass-sources.jar \
             dist/maven-central/central-bundle.zip \
             adapters/okhttp/library/build/outputs/aar/library-release.aar \
-            adapters/okhttp/library/build/libs/library-sources.jar
+            dist/android/jissr-bypass-okhttp-sources.jar
           unzip -q dist/maven-central/central-bundle.zip \
             -d dist/maven-central/verify
           release_dir=dist/maven-central/verify/org/jissr/jissr-bypass-android/0.0.0-ci
@@ -118,8 +124,8 @@ jobs:
           path: |
             dist/android/jissr-bypass.aar
             dist/android/jissr-bypass-sources.jar
+            dist/android/jissr-bypass-okhttp-sources.jar
             adapters/okhttp/library/build/outputs/aar/library-release.aar
-            adapters/okhttp/library/build/libs/library-sources.jar
           if-no-files-found: error
 
   android-consumer:
