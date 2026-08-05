@@ -300,7 +300,7 @@ func loadProfile(accessToken: String) async throws -> BypassHTTPResponse {
         }
         return BypassHTTPResponse(
             statusCode: Int(response.getStatusCode()),
-            body: response.getBody(),
+            body: response.getBody() ?? Data(),
             headersJSON: response.getHeadersJSON()
         )
     }.value

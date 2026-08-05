@@ -42,7 +42,7 @@ public enum JissrBypassURLSession {
                 return AdapterResponse(
                     statusCode: Int(response.getStatusCode()),
                     headersJSON: response.getHeadersJSON(),
-                    body: response.getBody()
+                    body: response.getBody() ?? Data()
                 )
             }
         )

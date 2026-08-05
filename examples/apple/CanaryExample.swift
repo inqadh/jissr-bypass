@@ -23,7 +23,7 @@ func fetchWithJissrBypass() async throws -> BypassResponse {
         }
         return BypassResponse(
             statusCode: Int(response.getStatusCode()),
-            body: response.getBody(),
+            body: response.getBody() ?? Data(),
             headersJSON: response.getHeadersJSON()
         )
     }.value
