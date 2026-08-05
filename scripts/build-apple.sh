@@ -11,7 +11,6 @@ go tool gomobile init
 go tool gomobile bind \
   -target=ios,iossimulator,macos \
   -iosversion=15.0 \
-  -macosxversion=12.0 \
   -o "$OUTPUT" \
   ./mobile
 
