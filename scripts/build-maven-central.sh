@@ -88,7 +88,9 @@ cat >"$release_dir/$pom_name" <<EOF
   </licenses>
   <developers>
     <developer>
-      <name>Inqadh Open Source Maintainers</name>
+      <id>inqadh</id>
+      <name>المجلس الوطني للإنقاذ</name>
+      <email>releases@inqadh.com</email>
       <organization>المجلس الوطني للإنقاذ</organization>
       <organizationUrl>https://www.inqadh.com/</organizationUrl>
     </developer>

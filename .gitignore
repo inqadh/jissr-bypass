@@ -1,4 +1,5 @@
 /dist/
+/.secrets/
 /canary/node_modules/
 /canary/package-lock.json
 *.xcframework
