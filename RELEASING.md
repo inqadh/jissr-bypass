@@ -58,6 +58,10 @@ the CLI must verify the versioned nonce challenge.
 8. Upload signed desktop archives, checksums, and SBOMs.
 9. Re-run the public canary examples from a clean consumer project.
 
+For Android, also verify that the Maven Javadoc JAR contains generated
+`jissrbypass` HTML pages rather than only a documentation pointer, and build a
+clean Gradle consumer against the exact published coordinate.
+
 ## Maven Central
 
 Android is published as:

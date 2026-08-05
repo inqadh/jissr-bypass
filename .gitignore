@@ -1,4 +1,8 @@
 /dist/
+/.gradle/
+**/.gradle/
+**/build/
+**/local.properties
 /.secrets/
 /canary/node_modules/
 /canary/package-lock.json

@@ -55,37 +55,50 @@ go run ./cmd/jissr-bypass -probe blocked.yusef.ren
 
 ## Android
 
-Build the AAR on Windows:
+Add Maven Central to the application's repositories (Android projects include
+it by default), then add the package:
+
+```kotlin
+dependencies {
+    implementation("org.jissr:jissr-bypass-android:0.1.0-rc.2")
+}
+```
+
+The library requires Android API 26 or newer and contains native libraries for
+the four standard Android ABIs. An Android App Bundle delivers only the native
+library required by the target device. The AAR has no additional Maven runtime
+dependencies.
+
+Call it from a background dispatcher:
+
+```kotlin
+import jissrbypass.Jissrbypass
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+
+val response = withContext(Dispatchers.IO) {
+    Jissrbypass.newClient().execute(
+        "GET",
+        "https://api.example.com/v1/profile",
+        ByteArray(0),
+        """{"Authorization":"Bearer <access-token>"}"""
+    )
+}
+check(response.statusCode in 200L..299L)
+```
+
+Reuse the client for related requests. `execute` returns the status code,
+response bytes, and response headers as JSON. Transport failures throw an
+exception; non-2xx HTTP responses are returned normally.
+
+To build the AAR locally on Windows:
 
 ```powershell
 .\scripts\build-android.ps1
 ```
 
-Add `dist/android/jissr-bypass.aar` to the application's dependencies, then:
-
-```kotlin
-import jissrbypass.Jissrbypass
-
-val response = Jissrbypass.newClient().execute(
-    "GET",
-    "https://api.example.com/v1/profile",
-    ByteArray(0),
-    """{"Authorization":"Bearer <access-token>"}"""
-)
-check(response.statusCode in 200L..299L)
-```
-
-Network calls are blocking and must run on a background dispatcher. The
-complete sample is in `examples/android`.
-
-The Maven Central coordinate is:
-
-```kotlin
-implementation("org.jissr:jissr-bypass-android:0.1.0")
-```
-
-Use a published release version in place of `0.1.0`. Release candidates retain
-their suffix, for example `0.1.0-rc.1`.
+See the [complete Android guide](docs/android.md) and
+[sample Activity](examples/android/MainActivity.kt).
 
 ## Apple platforms
 

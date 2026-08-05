@@ -138,20 +138,16 @@ before mobile integration.
 
 ### Android
 
-Build the binding:
-
-```powershell
-.\scripts\build-android.ps1
-```
-
-Copy `dist/android/jissr-bypass.aar` into the app's `app/libs` directory and
-add it to the app module:
+Add the published package from Maven Central:
 
 ```kotlin
 dependencies {
-    implementation(files("libs/jissr-bypass.aar"))
+    implementation("org.jissr:jissr-bypass-android:<version>")
 }
 ```
+
+Pin a reviewed immutable version; do not use `+`, `latest.release`, or a
+version range.
 
 Ensure the manifest contains:
 
@@ -159,9 +155,8 @@ Ensure the manifest contains:
 <uses-permission android:name="android.permission.INTERNET" />
 ```
 
-The planned public Maven coordinate is
-`org.jissr:jissr-bypass-android:<version>`. Until it is published, pin and
-checksum the AAR supplied with the release.
+To build the binding from source instead, run
+`.\scripts\build-android.ps1` and use the AAR in `dist/android`.
 
 ### iOS and macOS
 
@@ -226,6 +221,8 @@ import jissrbypass.Jissrbypass
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+private val bypassClient = Jissrbypass.newClient()
+
 suspend fun loadProfile(accessToken: String): String =
     withContext(Dispatchers.IO) {
         val headers = """
@@ -235,7 +232,7 @@ suspend fun loadProfile(accessToken: String): String =
             }
         """.trimIndent()
 
-        val response = Jissrbypass.newClient().execute(
+        val response = bypassClient.execute(
             "GET",
             "https://api.example.com/v1/profile",
             ByteArray(0),
