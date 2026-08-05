@@ -57,14 +57,20 @@ jobs:
             :library:testDebugUnitTest \
             :library:assembleRelease \
             :library:sourceReleaseJar
+          sources_jar="$(
+            find adapters/okhttp/library/build \
+              -type f -name '*sources*.jar' -print -quit
+          )"
+          test -n "$sources_jar"
+          cp "$sources_jar" dist/android/jissr-bypass-okhttp-sources.jar
       - uses: actions/upload-artifact@v6
         with:
           name: android
           path: |
             dist/android/jissr-bypass.aar
             dist/android/jissr-bypass-sources.jar
+            dist/android/jissr-bypass-okhttp-sources.jar
             adapters/okhttp/library/build/outputs/aar/library-release.aar
-            adapters/okhttp/library/build/libs/library-sources.jar
           if-no-files-found: error
 
   apple:

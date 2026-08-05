@@ -15,12 +15,12 @@ let package = Package(
     ],
     targets: [
         .binaryTarget(
-            name: "Jissrbypass",
+            name: "JissrBypass",
             path: "Binaries/JissrBypass.xcframework"
         ),
         .target(
             name: "JissrBypassURLSession",
-            dependencies: ["Jissrbypass"]
+            dependencies: ["JissrBypass"]
         ),
         .testTarget(
             name: "JissrBypassURLSessionTests",

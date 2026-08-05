@@ -1,5 +1,5 @@
 import Foundation
-import Jissrbypass
+import JissrBypass
 
 public enum JissrBypassURLSessionError: Error {
     case invalidProtectedHost

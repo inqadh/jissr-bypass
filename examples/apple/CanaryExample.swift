@@ -1,5 +1,5 @@
 import Foundation
-import Jissrbypass
+import JissrBypass
 
 struct BypassResponse {
     let statusCode: Int

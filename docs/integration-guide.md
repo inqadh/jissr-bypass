@@ -167,7 +167,7 @@ Build on macOS with Xcode installed:
 ```
 
 Drag `dist/apple/JissrBypass.xcframework` into the Xcode project, select the app
-target, and use **Embed & Sign**. Add `import Jissrbypass` in Swift sources that
+target, and use **Embed & Sign**. Add `import JissrBypass` in Swift sources that
 call the binding.
 
 Public distribution uses the organization-owned
@@ -273,7 +273,7 @@ The binding is synchronous, so call it outside the main actor:
 
 ```swift
 import Foundation
-import Jissrbypass
+import JissrBypass
 
 struct BypassHTTPResponse {
     let statusCode: Int

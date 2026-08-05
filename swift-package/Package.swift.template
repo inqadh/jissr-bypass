@@ -9,8 +9,8 @@ let package = Package(
     ],
     products: [
         .library(
-            name: "Jissrbypass",
-            targets: ["Jissrbypass"]
+            name: "JissrBypass",
+            targets: ["JissrBypass"]
         ),
         .library(
             name: "JissrBypassURLSession",
@@ -19,13 +19,13 @@ let package = Package(
     ],
     targets: [
         .binaryTarget(
-            name: "Jissrbypass",
+            name: "JissrBypass",
             url: "https://github.com/inqadh/jissr-bypass/releases/download/v@VERSION@/JissrBypass.xcframework.zip",
             checksum: "@CHECKSUM@"
         ),
         .target(
             name: "JissrBypassURLSession",
-            dependencies: ["Jissrbypass"]
+            dependencies: ["JissrBypass"]
         ),
         .testTarget(
             name: "JissrBypassURLSessionTests",
