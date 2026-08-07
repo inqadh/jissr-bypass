@@ -143,7 +143,13 @@ jobs:
           gradle-version: "9.4.1"
       - name: Build clean Maven Central consumer
         working-directory: examples/android
-        run: gradle --no-daemon :app:assembleDebug
+        # Main may document the next immutable version before Central has
+        # replicated it. Keep this job pinned to the latest already-published
+        # stable package; the release checklist verifies the new coordinate.
+        run: >
+          gradle --no-daemon
+          -PjissrBypassVersion=0.1.0
+          :app:assembleDebug
 
   apple:
     name: Apple XCFramework
