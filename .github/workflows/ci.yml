@@ -148,7 +148,7 @@ jobs:
         # stable package; the release checklist verifies the new coordinate.
         run: >
           gradle --no-daemon
-          -PjissrBypassVersion=0.1.0
+          -PjissrBypassVersion=0.1.1
           :app:assembleDebug
 
   apple:
