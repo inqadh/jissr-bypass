@@ -16,6 +16,11 @@ on:
         required: true
         default: false
         type: boolean
+      deployment_id:
+        description: Publish an already-validated Central deployment
+        required: false
+        default: ""
+        type: string
 
 permissions:
   contents: read
@@ -23,6 +28,7 @@ permissions:
 jobs:
   build:
     name: Build signed Maven bundle
+    if: ${{ inputs.deployment_id == '' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment: maven-central
@@ -127,3 +133,56 @@ jobs:
             echo
             echo "The deployment is user-managed and has not been made public."
           } >>"$GITHUB_STEP_SUMMARY"
+
+  publish:
+    name: Publish validated Central deployment
+    if: ${{ inputs.deployment_id != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: maven-central
+    steps:
+      - name: Publish and wait for Maven Central
+        env:
+          CENTRAL_TOKEN_USERNAME: ${{ secrets.CENTRAL_TOKEN_USERNAME }}
+          CENTRAL_TOKEN_PASSWORD: ${{ secrets.CENTRAL_TOKEN_PASSWORD }}
+          DEPLOYMENT_ID: ${{ inputs.deployment_id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! "$DEPLOYMENT_ID" =~ ^[0-9a-fA-F-]{36}$ ]]; then
+            echo "Invalid Central deployment identifier." >&2
+            exit 2
+          fi
+          auth_token="$(
+            printf '%s:%s' \
+              "$CENTRAL_TOKEN_USERNAME" \
+              "$CENTRAL_TOKEN_PASSWORD" |
+              base64 |
+              tr -d '\r\n'
+          )"
+          curl --fail-with-body --silent --show-error \
+            --request POST \
+            --header "Authorization: Bearer $auth_token" \
+            "https://central.sonatype.com/api/v1/publisher/deployment/$DEPLOYMENT_ID"
+          for _ in $(seq 1 90); do
+            status_json="$(
+              curl --fail-with-body --silent --show-error \
+                --request POST \
+                --header "Authorization: Bearer $auth_token" \
+                "https://central.sonatype.com/api/v1/publisher/status?id=$DEPLOYMENT_ID"
+            )"
+            state="$(printf '%s' "$status_json" | jq -r '.deploymentState')"
+            echo "Central state: $state"
+            case "$state" in
+              PUBLISHED)
+                exit 0
+                ;;
+              FAILED)
+                printf '%s\n' "$status_json" | jq .
+                exit 1
+                ;;
+            esac
+            sleep 10
+          done
+          echo "Timed out waiting for Maven Central publication." >&2
+          exit 1

@@ -81,8 +81,10 @@ Maven Central components are immutable. Run the `Maven Central` workflow
 manually with a tag and the same version without the `v` prefix. Keep `upload`
 disabled to build and inspect the signed bundle only. For an approved public
 release, enable `upload`, inspect the validated user-managed deployment, and
-publish it from Central. Verify both coordinates from a clean Maven Central
-consumer after publication.
+publish it from Central. The same workflow accepts the validated
+`deployment_id` to perform and monitor that final publication without exposing
+Central credentials locally. Verify both coordinates from a clean Maven
+Central consumer after publication.
 
 When `upload` is enabled, the workflow submits a `USER_MANAGED` deployment. It
 waits for Central validation but does not make the component public. Inspect

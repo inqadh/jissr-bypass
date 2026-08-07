@@ -7,7 +7,8 @@ records over DNS-over-HTTPS and performs TLS 1.3 with Encrypted Client Hello
 
 The same Go core builds for Android, iOS, macOS, Windows, and Linux.
 
-> Status: pre-release. The public API may change before `v1.0.0`.
+> Status: stable `0.1.x`. Releases follow Semantic Versioning; review upgrade
+> notes while the public API is still below `v1.0.0`.
 
 For server setup and complete application examples, follow the
 [A-to-Z integration guide](docs/integration-guide.md).
