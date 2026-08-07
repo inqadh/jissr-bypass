@@ -5,10 +5,41 @@ import (
 	"testing"
 )
 
+type recordingListener struct {
+	event *Event
+}
+
+func (listener *recordingListener) OnEvent(event *Event) {
+	listener.event = event
+}
+
 func TestNewClient(t *testing.T) {
 	if NewClient() == nil {
 		t.Fatal("NewClient returned nil")
 	}
+	if NewAutoClient() == nil {
+		t.Fatal("NewAutoClient returned nil")
+	}
+	configured, err := NewAutoClientWithTimeout(250)
+	if err != nil || configured == nil {
+		t.Fatalf("NewAutoClientWithTimeout: client=%v err=%v", configured, err)
+	}
+	if _, err := NewAutoClientWithTimeout(0); err == nil {
+		t.Fatal("zero native timeout accepted")
+	}
+}
+
+func TestEventListenerAdapter(t *testing.T) {
+	client := NewClient()
+	listener := &recordingListener{}
+	client.SetEventListener(listener)
+	client.CloseIdleConnections()
+	if listener.event == nil ||
+		listener.event.GetType() != "connections.idle_closed" ||
+		listener.event.GetStage() != "lifecycle" {
+		t.Fatalf("unexpected event: %#v", listener.event)
+	}
+	client.SetEventListener(nil)
 }
 
 func TestDecodeHeaders(t *testing.T) {

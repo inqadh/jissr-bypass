@@ -12,7 +12,7 @@ gradle :app:assembleDebug
 To test another immutable package version:
 
 ```sh
-gradle :app:assembleDebug -PjissrBypassVersion=0.1.0-rc.2
+gradle :app:assembleDebug -PjissrBypassVersion=0.1.1
 ```
 
 Install the generated debug APK on an Android API 26 or newer device. The

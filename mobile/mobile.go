@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 
 	core "github.com/inqadh/jissr-bypass"
 )
@@ -13,6 +14,87 @@ import (
 // Client wraps the shared ECH transport.
 type Client struct {
 	core *core.Client
+}
+
+// EventListener receives major transport decisions. Implementations must
+// return promptly and must not call the same Client from OnEvent.
+type EventListener interface {
+	OnEvent(event *Event)
+}
+
+// Event is a gomobile-compatible transport event.
+type Event struct {
+	eventType          string
+	host               string
+	route              string
+	stage              string
+	reason             string
+	detail             string
+	resolver           string
+	cached             bool
+	safeToFallback     bool
+	likelyInterference bool
+}
+
+func (event *Event) GetType() string {
+	if event == nil {
+		return ""
+	}
+	return event.eventType
+}
+
+func (event *Event) GetHost() string {
+	if event == nil {
+		return ""
+	}
+	return event.host
+}
+
+func (event *Event) GetRoute() string {
+	if event == nil {
+		return ""
+	}
+	return event.route
+}
+
+func (event *Event) GetStage() string {
+	if event == nil {
+		return ""
+	}
+	return event.stage
+}
+
+func (event *Event) GetReason() string {
+	if event == nil {
+		return ""
+	}
+	return event.reason
+}
+
+func (event *Event) GetDetail() string {
+	if event == nil {
+		return ""
+	}
+	return event.detail
+}
+
+func (event *Event) GetResolver() string {
+	if event == nil {
+		return ""
+	}
+	return event.resolver
+}
+
+func (event *Event) GetCached() bool {
+	return event != nil && event.cached
+}
+
+func (event *Event) GetSafeToFallback() bool {
+	return event != nil && event.safeToFallback
+}
+
+func (event *Event) GetLikelyInterference() bool {
+	return event != nil && event.likelyInterference
 }
 
 // Response is a gomobile-compatible HTTP response.
@@ -59,6 +141,73 @@ func (response *Response) GetHeadersJSON() string {
 // set. Advanced native integrations should use the root Go package directly.
 func NewClient() *Client {
 	return &Client{core: core.NewDefaultClient()}
+}
+
+// NewAutoClient creates a client that remembers whether each host should use
+// the ordinary native transport or Jissr Bypass.
+func NewAutoClient() *Client {
+	return &Client{core: core.NewAutoClient()}
+}
+
+// NewAutoClientWithTimeout creates an auto client with an application-defined
+// total native route-attempt budget in milliseconds.
+func NewAutoClientWithTimeout(timeoutMillis int64) (*Client, error) {
+	if timeoutMillis <= 0 {
+		return nil, fmt.Errorf("native attempt timeout must be greater than zero")
+	}
+	if timeoutMillis > int64(time.Duration(1<<63-1)/time.Millisecond) {
+		return nil, fmt.Errorf("native attempt timeout is too large")
+	}
+	config := core.DefaultConfig()
+	config.NativeFirst = true
+	config.NativeAttemptTimeout = time.Duration(timeoutMillis) * time.Millisecond
+	client, err := core.NewClient(config)
+	if err != nil {
+		return nil, err
+	}
+	return &Client{core: client}, nil
+}
+
+// SetEventListener replaces the listener. Passing nil disables events.
+func (client *Client) SetEventListener(listener EventListener) {
+	if client == nil || client.core == nil {
+		return
+	}
+	if listener == nil {
+		client.core.SetEventHandler(nil)
+		return
+	}
+	client.core.SetEventHandler(func(event core.Event) {
+		listener.OnEvent(&Event{
+			eventType:          event.Type,
+			host:               event.Host,
+			route:              event.Route,
+			stage:              event.Stage,
+			reason:             event.Reason,
+			detail:             event.Detail,
+			resolver:           event.Resolver,
+			cached:             event.Cached,
+			safeToFallback:     event.SafeToFallback,
+			likelyInterference: event.LikelyInterference,
+		})
+	})
+}
+
+// ResetNetworkState clears cached route and resolution decisions after the
+// device changes networks.
+func (client *Client) ResetNetworkState() {
+	if client == nil || client.core == nil {
+		return
+	}
+	client.core.ResetNetworkState()
+}
+
+// CloseIdleConnections releases pooled native and ECH connections.
+func (client *Client) CloseIdleConnections() {
+	if client == nil || client.core == nil {
+		return
+	}
+	client.core.CloseIdleConnections()
 }
 
 // Fetch performs an ECH-protected HTTPS request.

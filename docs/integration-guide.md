@@ -247,6 +247,44 @@ suspend fun loadProfile(accessToken: String): String =
     }
 ```
 
+For applications that should use the platform route when it works and invoke
+ECH only when necessary, construct one long-lived auto client:
+
+```kotlin
+private val apiClient = Jissrbypass.newAutoClient()
+```
+
+The first request to a host gets a bounded native route check. Jissr Bypass
+falls back only when that attempt fails before a request could be transmitted,
+then caches the selected route for later requests. A request body that cannot
+be replayed safely uses the bypass route directly while the route is unknown.
+The ordinary bypass-only `newClient()` remains the right choice when a
+plaintext ClientHello must never be attempted.
+
+The default native-route budget is 750 milliseconds. Applications can tune it
+for their expected network conditions:
+
+```kotlin
+private val apiClient = Jissrbypass.newAutoClientWithTimeout(500)
+```
+
+For Go, set `Config.NativeAttemptTimeout` before calling `NewClient`. The
+timeout covers the complete native connection establishment attempt. It stops
+once a usable connection has been acquired, so it does not cap normal API
+server response time.
+
+Connection pooling and DNS/ECH caching belong to the client instance. Do not
+construct a client for every request. When Android reports a Wi-Fi, cellular,
+or VPN network change, call:
+
+```kotlin
+apiClient.resetNetworkState()
+```
+
+This closes stale connections and clears route and resolution decisions. Use
+`closeIdleConnections()` when the application deliberately releases its
+network resources.
+
 ### Android: JSON POST
 
 ```kotlin
@@ -350,6 +388,13 @@ func LoadProfile(ctx context.Context, token string) ([]byte, error) {
 ```
 
 Reuse one client for multiple requests. `Client` is safe for concurrent use.
+The Go equivalents of the mobile lifecycle methods are
+`ResetNetworkState()` and `CloseIdleConnections()`.
+
+Attach a structured event listener when the application needs diagnostics or
+telemetry about route selection and fallback. See
+[transport events](events.md) for the complete event contract and privacy
+rules.
 
 ## 7. Handle responses and redirects
 
@@ -396,8 +441,11 @@ the real call.
 
 `https://blocked.yusef.ren/v1/canary` is the project-hosted integration
 canary. It is already deployed and ready to use; consumers do not need to
-provision or manage its infrastructure. The `VerifyCanary` method generates a
-random nonce and verifies the echoed protocol, host, and timestamp:
+provision or manage its infrastructure. On affected Saudi networks, first
+requesting the URL with the platform's normal HTTPS client demonstrates the
+blocked path and may fail. Requesting it through Jissr Bypass should succeed.
+The `VerifyCanary` method generates a random nonce and verifies the echoed
+protocol, host, and timestamp:
 
 ```kotlin
 val resultJSON = Jissrbypass.newClient()

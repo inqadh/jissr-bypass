@@ -62,8 +62,17 @@ headers encoded as a JSON object of string arrays.
 
 ## Public API
 
-- `Jissrbypass.newClient()` creates a client with the maintained resolver
-  fallback set.
+- `Jissrbypass.newClient()` creates a bypass-only client with the maintained
+  resolver fallback set.
+- `Jissrbypass.newAutoClient()` tries the native route safely and caches the
+  working route per host.
+- `Jissrbypass.newAutoClientWithTimeout(milliseconds)` configures the complete
+  native-route attempt budget.
+- `Client.setEventListener(...)` reports major route and network events without
+  request content.
+- `Client.resetNetworkState()` clears cached route and resolution decisions
+  after a network change.
+- `Client.closeIdleConnections()` releases pooled idle connections.
 - `Client.execute(...)` performs an HTTPS request with request headers.
 - `Client.fetch(...)` performs a request and returns only the response body.
 - `Client.probe(host)` diagnoses DNS, HTTPS-record, ECH, and connection stages.

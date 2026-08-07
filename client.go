@@ -32,12 +32,17 @@ const (
 // Config controls resolver selection and network deadlines. Empty resolver
 // slices use the built-in Cloudflare and Google endpoints.
 type Config struct {
-	WireResolvers  []string
-	JSONResolvers  []string
-	ResolveTimeout time.Duration
-	DialTimeout    time.Duration
-	RequestTimeout time.Duration
-	UserAgent      string
+	WireResolvers        []string
+	JSONResolvers        []string
+	ResolveTimeout       time.Duration
+	ResolutionTTL        time.Duration
+	DialTimeout          time.Duration
+	RequestTimeout       time.Duration
+	NativeAttemptTimeout time.Duration
+	RouteTTL             time.Duration
+	NativeFirst          bool
+	UserAgent            string
+	EventHandler         EventHandler
 }
 
 // DefaultConfig returns conservative defaults suitable for mobile and desktop.
@@ -55,16 +60,14 @@ func DefaultConfig() Config {
 			"https://8.8.8.8/resolve",
 			"https://dns.google/resolve",
 		},
-		ResolveTimeout: 7 * time.Second,
-		DialTimeout:    10 * time.Second,
-		RequestTimeout: 30 * time.Second,
-		UserAgent:      defaultUserAgent,
+		ResolveTimeout:       7 * time.Second,
+		ResolutionTTL:        5 * time.Minute,
+		DialTimeout:          10 * time.Second,
+		RequestTimeout:       30 * time.Second,
+		NativeAttemptTimeout: 750 * time.Millisecond,
+		RouteTTL:             10 * time.Minute,
+		UserAgent:            defaultUserAgent,
 	}
-}
-
-// Client is safe for concurrent use.
-type Client struct {
-	config Config
 }
 
 // Result contains the complete bounded response returned by Execute.
@@ -88,11 +91,20 @@ func NewClient(config Config) (*Client, error) {
 	if config.ResolveTimeout <= 0 {
 		config.ResolveTimeout = defaults.ResolveTimeout
 	}
+	if config.ResolutionTTL <= 0 {
+		config.ResolutionTTL = defaults.ResolutionTTL
+	}
 	if config.DialTimeout <= 0 {
 		config.DialTimeout = defaults.DialTimeout
 	}
 	if config.RequestTimeout <= 0 {
 		config.RequestTimeout = defaults.RequestTimeout
+	}
+	if config.NativeAttemptTimeout <= 0 {
+		config.NativeAttemptTimeout = defaults.NativeAttemptTimeout
+	}
+	if config.RouteTTL <= 0 {
+		config.RouteTTL = defaults.RouteTTL
 	}
 	if config.UserAgent == "" {
 		config.UserAgent = defaults.UserAgent
@@ -103,13 +115,23 @@ func NewClient(config Config) (*Client, error) {
 			return nil, fmt.Errorf("invalid DoH endpoint %q", endpoint)
 		}
 	}
-	return &Client{config: config}, nil
+	return newClient(config), nil
 }
 
 // NewDefaultClient constructs a client with Cloudflare and Google fallbacks.
 // Its signature is deliberately gomobile-friendly.
 func NewDefaultClient() *Client {
 	client, _ := NewClient(DefaultConfig())
+	return client
+}
+
+// NewAutoClient constructs a client that tries the ordinary native transport
+// once per host/network decision, then remembers whether native or ECH should
+// be used. The bypass-only default remains available through NewDefaultClient.
+func NewAutoClient() *Client {
+	config := DefaultConfig()
+	config.NativeFirst = true
+	client, _ := NewClient(config)
 	return client
 }
 
@@ -128,9 +150,7 @@ func (c *Client) Resolve(ctx context.Context, host string) (Resolution, error) {
 	if err != nil {
 		return Resolution{}, err
 	}
-	resolveCtx, cancel := context.WithTimeout(ctx, c.config.ResolveTimeout)
-	defer cancel()
-	return resolveECH(resolveCtx, host, c.config)
+	return c.resolveCached(ctx, host)
 }
 
 func canonicalHost(host string) (string, error) {
@@ -180,32 +200,7 @@ func (c *Client) Do(request *http.Request) (*http.Response, error) {
 	}
 	request = request.Clone(request.Context())
 	request.Header = request.Header.Clone()
-	resolution, err := c.Resolve(request.Context(), host)
-	if err != nil {
-		return nil, fmt.Errorf("resolve %s: %w", host, err)
-	}
-
-	dialer := &net.Dialer{Timeout: c.config.DialTimeout}
-	transport := &http.Transport{
-		DialTLSContext: func(ctx context.Context, network, _ string) (net.Conn, error) {
-			return dialECH(ctx, dialer, network, resolution.IP, host, resolution.ECH, []string{"h2", "http/1.1"})
-		},
-		ForceAttemptHTTP2: true,
-	}
-	if request.Header == nil {
-		request.Header = make(http.Header)
-	}
-	if request.Header.Get("User-Agent") == "" {
-		request.Header.Set("User-Agent", c.config.UserAgent)
-	}
-	httpClient := &http.Client{
-		Transport: transport,
-		Timeout:   c.config.RequestTimeout,
-		CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
-			return http.ErrUseLastResponse
-		},
-	}
-	return httpClient.Do(request)
+	return c.doPrepared(request, host)
 }
 
 // Execute creates and sends an ECH-protected HTTPS request. Unlike Fetch, it
@@ -312,6 +307,7 @@ func (c *Client) Probe(host string) *ProbeResult {
 		host,
 		resolution.ECH,
 		nil,
+		nil,
 	)
 	if err != nil {
 		if strings.HasPrefix(err.Error(), "tcp:") {
@@ -329,7 +325,14 @@ func (c *Client) Probe(host string) *ProbeResult {
 // dialECH retries once when the authenticated rejection carries a fresh
 // ECHConfigList. This handles normal provider key rotation without falling back
 // to a plaintext ClientHello.
-func dialECH(ctx context.Context, dialer *net.Dialer, network, ip, host string, echConfig []byte, protocols []string) (net.Conn, error) {
+func dialECH(
+	ctx context.Context,
+	dialer *net.Dialer,
+	network, ip, host string,
+	echConfig []byte,
+	protocols []string,
+	onRetryConfig func([]byte),
+) (net.Conn, error) {
 	config := append([]byte(nil), echConfig...)
 	for attempt := 0; attempt < 2; attempt++ {
 		raw, err := dialer.DialContext(ctx, network, net.JoinHostPort(ip, "443"))
@@ -350,6 +353,9 @@ func dialECH(ctx context.Context, dialer *net.Dialer, network, ip, host string, 
 		var rejection *tls.ECHRejectionError
 		if attempt == 0 && errors.As(err, &rejection) && validECHConfigList(rejection.RetryConfigList) {
 			config = append([]byte(nil), rejection.RetryConfigList...)
+			if onRetryConfig != nil {
+				onRetryConfig(config)
+			}
 			continue
 		}
 		return nil, fmt.Errorf("ECH handshake: %w", err)

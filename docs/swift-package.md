@@ -19,7 +19,7 @@ published by the core release.
 
    ```powershell
    .\scripts\prepare-swift-package.ps1 `
-       -Version 0.1.0-rc.3 `
+       -Version 0.1.1 `
        -XCFrameworkZip .\JissrBypass.xcframework.zip `
        -Output .\dist\swift-package
    ```

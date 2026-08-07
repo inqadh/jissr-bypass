@@ -40,7 +40,7 @@ Add a fixed version to the application module:
 ```kotlin
 // app/build.gradle.kts
 dependencies {
-    implementation("org.jissr:jissr-bypass-android:0.1.0-rc.2")
+    implementation("org.jissr:jissr-bypass-android:0.1.1")
 }
 ```
 
@@ -49,8 +49,8 @@ the same version:
 
 ```kotlin
 dependencies {
-    implementation("org.jissr:jissr-bypass-android:0.1.0-rc.3")
-    implementation("org.jissr:jissr-bypass-okhttp:0.1.0-rc.3")
+    implementation("org.jissr:jissr-bypass-android:0.1.1")
+    implementation("org.jissr:jissr-bypass-okhttp:0.1.1")
 }
 ```
 
@@ -70,7 +70,7 @@ Groovy projects use:
 
 ```groovy
 dependencies {
-    implementation "org.jissr:jissr-bypass-android:0.1.0-rc.2"
+    implementation "org.jissr:jissr-bypass-android:0.1.1"
 }
 ```
 
@@ -128,6 +128,18 @@ class ProtectedApi {
 Reuse a client across requests. The client maintains the resolver configuration
 and HTTP transport needed for consistent behavior.
 
+For native-first routing with an automatic ECH fallback, create one auto client:
+
+```kotlin
+private val client = Jissrbypass.newAutoClientWithTimeout(500)
+```
+
+The timeout is the complete native-route attempt budget in milliseconds. When
+the ordinary route fails safely before request transmission, the client uses
+the protected route and caches the working choice for that host. Call
+`resetNetworkState()` after a material network change so the next request makes
+a fresh decision.
+
 ## Request and response model
 
 `Client.execute(method, url, body, headersJSON)` accepts:
@@ -166,6 +178,32 @@ starting work that is no longer needed. A coroutine cancellation stops awaiting
 the result but may not immediately interrupt native work.
 
 Never call the API from the Android main thread.
+
+`newAutoClientWithTimeout(milliseconds)` controls route detection, not the
+overall request deadline. Keep the application-level request deadline larger
+than this value so the fallback still has time to complete.
+
+## Transport events
+
+Attach an event listener when the application needs to record route selection
+or show transport diagnostics:
+
+```kotlin
+client.setEventListener(object : EventListener {
+    override fun onEvent(event: Event?) {
+        when (event?.getType()) {
+            "native.failed" -> recordNativeFailure(event.getReason())
+            "fallback.started" -> recordProtectedFallback(event.getHost())
+            "bypass.selected" -> recordSelectedRoute(event.getCached())
+        }
+    }
+})
+```
+
+Events contain bounded transport metadata, not request paths, headers, bodies,
+tokens, cookies, or response payloads. `likelyInterference` is evidence that is
+consistent with a pre-TLS network failure; it is not proof of deliberate
+blocking. See the complete [transport event contract](events.md).
 
 ## Diagnostics
 

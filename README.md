@@ -27,6 +27,7 @@ import (
 )
 
 func main() {
+    client := bypass.NewAutoClient()
     request, err := http.NewRequestWithContext(
         context.Background(),
         http.MethodGet,
@@ -37,7 +38,7 @@ func main() {
         log.Fatal(err)
     }
     request.Header.Set("Authorization", "Bearer <access-token>")
-    response, err := bypass.NewDefaultClient().Do(request)
+    response, err := client.Do(request)
     if err != nil {
         log.Fatal(err)
     }
@@ -45,6 +46,12 @@ func main() {
     fmt.Printf("HTTP %d\n", response.StatusCode)
 }
 ```
+
+`NewAutoClient` tries the ordinary HTTPS route once, falls back only when the
+failure occurs before a request can be sent, and remembers the working route
+per host. Use `NewDefaultClient` when every request must use ECH without first
+trying the ordinary route. Both clients pool HTTPS connections and cache
+DNS/ECH answers; create one long-lived client rather than one per request.
 
 The diagnostic CLI uses the same core:
 
@@ -60,7 +67,7 @@ it by default), then add the package:
 
 ```kotlin
 dependencies {
-    implementation("org.jissr:jissr-bypass-android:0.1.0-rc.2")
+    implementation("org.jissr:jissr-bypass-android:<version>")
 }
 ```
 
@@ -76,8 +83,9 @@ import jissrbypass.Jissrbypass
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+val client = Jissrbypass.newAutoClient()
 val response = withContext(Dispatchers.IO) {
-    Jissrbypass.newClient().execute(
+    client.execute(
         "GET",
         "https://api.example.com/v1/profile",
         ByteArray(0),
@@ -87,9 +95,40 @@ val response = withContext(Dispatchers.IO) {
 check(response.statusCode in 200L..299L)
 ```
 
-Reuse the client for related requests. `execute` returns the status code,
+Reuse the client for related requests. Call `resetNetworkState()` after the
+device changes networks so the next request selects a fresh route.
+`execute` returns the status code,
 response bytes, and response headers as JSON. Transport failures throw an
 exception; non-2xx HTTP responses are returned normally.
+
+Apps can choose the native-route detection budget and observe fallback:
+
+```kotlin
+import jissrbypass.Event
+import jissrbypass.EventListener
+import jissrbypass.Jissrbypass
+
+val client = Jissrbypass.newAutoClientWithTimeout(500)
+client.setEventListener(object : EventListener {
+    override fun onEvent(event: Event?) {
+        if (event?.getType() == "fallback.started") {
+            analytics.record(
+                "jissr_fallback",
+                mapOf(
+                    "host" to event.getHost(),
+                    "reason" to event.getReason(),
+                    "likelyInterference" to event.getLikelyInterference()
+                )
+            )
+        }
+    }
+})
+```
+
+The listener receives decisions, not request content. A
+`likelyInterference=true` native failure means fallback was safe before TLS
+completed; it is useful diagnostic evidence but is not proof that a particular
+network deliberately blocked the host. See [transport events](docs/events.md).
 
 To build the AAR locally on Windows:
 
@@ -134,7 +173,9 @@ central session without changing existing `URLRequest` construction. See the
 ## Canary protocol
 
 `blocked.yusef.ren` is a project-hosted connectivity canary that is ready for
-SDK consumers to use. The client generates a random nonce and requests:
+SDK consumers to use. It is an example hostname that is blocked on affected
+Saudi networks: a normal HTTPS request may fail, while the same request through
+Jissr Bypass should succeed. The client generates a random nonce and requests:
 
 ```text
 GET https://blocked.yusef.ren/v1/canary?nonce=<base64url>
@@ -175,6 +216,9 @@ integrating it into a production application.
 The canonical source and Go module path are
 [`github.com/inqadh/jissr-bypass`](https://github.com/inqadh/jissr-bypass).
 Go module versions are immutable once published.
+
+Performance methodology and reproducible Go/Android commands are in
+[docs/benchmarks.md](docs/benchmarks.md).
 
 ## License
 
